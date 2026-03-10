@@ -126,6 +126,54 @@ const CSS = `
 @keyframes pulseGlow{0%,100%{box-shadow:0 0 18px rgba(6,214,160,0.12)}50%{box-shadow:0 0 30px rgba(6,214,160,0.22)}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .fade-card{animation:fadeUp 0.45s ease both}
+
+/* Responsive grid classes */
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid-2-asym{display:grid;grid-template-columns:1.2fr 0.8fr;gap:18px}
+.grid-span-full{grid-column:1/-1}
+
+/* Header */
+.hdr-pad{padding:18px 28px}
+.content-pad{padding:24px 28px}
+.nav-pad{padding:0 28px}
+.status-dots{display:flex;gap:10px;margin-right:6px}
+.hdr-title{font-size:16px}
+.login-card{width:400px}
+.user-name{display:inline}
+.nav-tabs{-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.nav-tabs::-webkit-scrollbar{display:none}
+.login-inner{padding:36px 32px 32px}
+.gauge-wrap{gap:36px;flex-direction:row}
+
+@media(max-width:1024px){
+  .grid-4{grid-template-columns:repeat(2,1fr)}
+  .grid-3{grid-template-columns:repeat(2,1fr)}
+}
+
+@media(max-width:768px){
+  .grid-4{grid-template-columns:1fr 1fr;gap:8px}
+  .grid-3{grid-template-columns:1fr;gap:10px}
+  .grid-2{grid-template-columns:1fr;gap:14px}
+  .grid-2-asym{grid-template-columns:1fr;gap:14px}
+  .hdr-pad{padding:12px 14px}
+  .content-pad{padding:14px 14px}
+  .nav-pad{padding:0 8px}
+  .status-dots{display:none}
+  .hdr-title{font-size:13px}
+  .login-card{width:calc(100vw - 32px);max-width:400px}
+  .login-inner{padding:28px 20px 24px}
+  .user-name{display:none}
+  .gauge-wrap{gap:16px;flex-direction:column}
+}
+
+@media(max-width:480px){
+  .grid-4{grid-template-columns:1fr;gap:8px}
+  .grid-3{grid-template-columns:1fr;gap:8px}
+  .hdr-pad{padding:10px 12px}
+  .content-pad{padding:12px 10px}
+}
 `;
 
 // ─── AUTH SYSTEM ────────────────────────────────────────────────────
@@ -186,14 +234,14 @@ function LoginScreen({ onLogin }) {
       <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", opacity: 0.03, backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`, backgroundSize: "60px 60px" }} />
 
       {/* Login card */}
-      <div className={`fade-card ${shake ? "shake" : ""}`} style={{
-        ...glassCard, width: 400, padding: "0", position: "relative", zIndex: 1,
+      <div className={`fade-card login-card ${shake ? "shake" : ""}`} style={{
+        ...glassCard, padding: "0", position: "relative", zIndex: 1,
         boxShadow: "0 8px 60px rgba(0,0,0,0.4), 0 0 40px rgba(6,214,160,0.06)",
       }}>
         {/* Top accent line */}
         <div style={{ height: 2, background: `linear-gradient(90deg, ${V.cyan}, ${V.blue}, ${V.purple})` }} />
 
-        <div style={{ padding: "36px 32px 32px" }}>
+        <div className="login-inner">
           {/* Logo */}
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: V.bg, boxShadow: `0 0 30px ${V.cyan}33`, marginBottom: 16, letterSpacing: -1 }}>RS</div>
@@ -484,17 +532,17 @@ function DashboardMain({ user, onLogout }) {
 
       <div style={{ position: "relative", zIndex: 1 }}>
         {/* HEADER */}
-        <header style={{ padding: "18px 28px", borderBottom: `1px solid ${V.glassBorder}`, backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 10, background: "rgba(10,14,23,0.85)" }}>
+        <header className="hdr-pad" style={{ borderBottom: `1px solid ${V.glassBorder}`, backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 10, background: "rgba(10,14,23,0.85)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14, maxWidth: 1400, margin: "0 auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: V.bg, boxShadow: `0 0 18px ${V.cyan}44`, letterSpacing: -0.5 }}>RS</div>
               <div>
-                <h1 style={{ fontSize: 16, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2 }}>KPI's Recuperación & Seguimiento</h1>
+                <h1 className="hdr-title" style={{ fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2 }}>KPI's Recuperación & Seguimiento</h1>
                 <span style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, letterSpacing: 1 }}>DASHBOARD {new Date().getFullYear()}</span>
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", gap: 10, marginRight: 6 }}>
+              <div className="status-dots">
                 {[["NM","#dc2626"],["NC","#f59e0b"],["C","#6b7280"],["S","#3b82f6"],["E","#22c55e"]].map(([l,c]) => (
                   <div key={l} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 9, fontFamily: V.mono, color: V.textDim }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: c, boxShadow: `0 0 5px ${c}66` }} />{l}
@@ -580,7 +628,7 @@ function DashboardMain({ user, onLogout }) {
                 <div style={{ width: 22, height: 22, borderRadius: "50%", background: `linear-gradient(135deg, ${V.purple}, ${V.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>
                   {user.name.split(" ").map(n => n[0]).join("")}
                 </div>
-                <span style={{ fontSize: 10, fontFamily: V.mono, color: V.textMuted, fontWeight: 600 }}>{user.name}</span>
+                <span className="user-name" style={{ fontSize: 10, fontFamily: V.mono, color: V.textMuted, fontWeight: 600 }}>{user.name}</span>
                 <button onClick={onLogout} title="Cerrar sesión" style={{
                   background: "rgba(255,107,107,0.1)", border: `1px solid rgba(255,107,107,0.2)`,
                   borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
@@ -595,8 +643,8 @@ function DashboardMain({ user, onLogout }) {
         </header>
 
         {/* NAV */}
-        <nav style={{ padding: "0 28px", borderBottom: `1px solid ${V.glassBorder}`, background: "rgba(10,14,23,0.5)", backdropFilter: "blur(10px)", position: "sticky", top: 60, zIndex: 9 }}>
-          <div style={{ display: "flex", gap: 0, maxWidth: 1400, margin: "0 auto", overflowX: "auto" }}>
+        <nav className="nav-pad" style={{ borderBottom: `1px solid ${V.glassBorder}`, background: "rgba(10,14,23,0.5)", backdropFilter: "blur(10px)", position: "sticky", top: 56, zIndex: 9 }}>
+          <div className="nav-tabs" style={{ display: "flex", gap: 0, maxWidth: 1400, margin: "0 auto", overflowX: "auto" }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "11px 16px", background: "none", border: "none", borderBottom: tab === t.id ? `2px solid ${V.cyan}` : "2px solid transparent", color: tab === t.id ? V.cyan : V.textDim, cursor: "pointer", fontSize: 11, fontFamily: V.mono, fontWeight: tab === t.id ? 700 : 500, letterSpacing: 0.5, whiteSpace: "nowrap", transition: "all 0.2s" }}>{t.label}</button>
             ))}
@@ -604,16 +652,16 @@ function DashboardMain({ user, onLogout }) {
         </nav>
 
         {/* CONTENT */}
-        <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }} key={tab + meses.join(",")}>
+        <div className="content-pad" style={{ maxWidth: 1400, margin: "0 auto" }} key={tab + meses.join(",")}>
 
           {tab === "ingresos" && (<>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
+            <div className="grid-4" style={{ marginBottom: 22 }}>
               <Metric label="Ing. Comercial" value={fmtShort(sum(ingCom,"SaldoNeto"))} accent={V.cyan} delay={0} sub={`${ingCom.length} clientes`} />
               <Metric label="Ing. Jurídico" value={fmtShort(sum(ingJur,"SaldoNeto"))} accent={V.coral} delay={70} sub={`${ingJur.length} clientes`} />
               <Metric label="Sal. Comercial" value={fmtShort(sum(salCom,"SaldoNeto"))} accent={V.blue} delay={140} sub={`${salCom.length} clientes`} />
               <Metric label="Sal. Jurídico" value={fmtShort(sum(salJur,"SaldoNeto"))} accent={V.purple} delay={210} sub={`${salJur.length} clientes`} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+            <div className="grid-2">
               <Panel title="Ingresos — Comercial" accent={V.cyan} delay={80}><GlassTable columns={traspCols} data={ingCom} accent={V.cyan} /></Panel>
               <Panel title="Ingresos — Jurídico" accent={V.coral} delay={150}><GlassTable columns={traspCols} data={ingJur} accent={V.coral} /></Panel>
               <Panel title="Salidas → Comercial" accent={V.blue} delay={220}><GlassTable columns={traspCols} data={salCom} accent={V.blue} /></Panel>
@@ -626,12 +674,12 @@ function DashboardMain({ user, onLogout }) {
             const arr = Object.entries(agg).map(([Cliente, PagoRecibido]) => ({ Cliente, PagoRecibido })).sort((a, b) => b.PagoRecibido - a.PagoRecibido);
             const total = sum(pagos, "PagoRecibido");
             return (<>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 22 }}>
+              <div className="grid-3" style={{ marginBottom: 22 }}>
                 <Metric label="Flujo 2025" value={fmtShort(total)} accent={V.cyan} sub={`${arr.length} clientes`} />
                 <Metric label="Flujo 2024" value="$29.93M" accent={V.amber} delay={70} sub="Año anterior (referencia)" />
                 <Metric label="Variación vs 2024" value={`${total > 29930000 ? "+" : ""}${((total/29930000-1)*100).toFixed(1)}%`} accent={total>29930000?V.cyan:V.coral} delay={140} sub="Crecimiento interanual" />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 18 }}>
+              <div className="grid-2-asym">
                 <Panel title="Detalle de Pagos" accent={V.cyan} delay={80}><GlassTable columns={pagoCols} data={arr} accent={V.cyan} /></Panel>
                 <Panel title="Distribución Mensual" accent={V.cyan} delay={160}><MiniPie data={pagos} /></Panel>
               </div>
@@ -639,7 +687,7 @@ function DashboardMain({ user, onLogout }) {
           })()}
 
           {tab === "traspasos" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+            <div className="grid-2">
               <Panel title="Traspasos a Comercial" accent={V.blue}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0" }}>
                   <Ring value={data.totales.traspComercial} min={10} max={18} label="RECORD COUNT" color={V.blue} />
@@ -658,11 +706,11 @@ function DashboardMain({ user, onLogout }) {
                   </div>
                 </div>
               </Panel>
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div className="grid-span-full">
                 <Panel title="Tiempo Promedio de Contacto" accent={V.amber} delay={160}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 36, padding: "10px 0" }}>
+                  <div className="gauge-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 0", flexWrap: "wrap" }}>
                     <Ring value={1.47} min={0} max={5} label="DÍAS" color={V.amber} size={150} />
-                    <div><div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, letterSpacing: 2, marginBottom: 4 }}>BITÁCORA TRASPASO-CONTACTO</div><div style={{ fontSize: 13, color: V.textMuted, lineHeight: 1.6, maxWidth: 320 }}>Promedio de días entre traspaso y primer contacto con el cliente.</div></div>
+                    <div style={{ textAlign: "center" }}><div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, letterSpacing: 2, marginBottom: 4 }}>BITÁCORA TRASPASO-CONTACTO</div><div style={{ fontSize: 13, color: V.textMuted, lineHeight: 1.6, maxWidth: 320 }}>Promedio de días entre traspaso y primer contacto con el cliente.</div></div>
                   </div>
                 </Panel>
               </div>
@@ -670,7 +718,7 @@ function DashboardMain({ user, onLogout }) {
           )}
 
           {tab === "staff" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+            <div className="grid-2">
               <Panel title="Tiempo Promedio — Tareas Staff" accent={V.amber}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0" }}>
                   <Ring value={data.promedioStaff} min={0} max={5} label="PROMEDIO DÍAS" color={V.amber} size={160} />
@@ -691,7 +739,7 @@ function DashboardMain({ user, onLogout }) {
           )}
 
           {tab === "bases" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+            <div className="grid-2">
               <Panel title="Bitácora Staff — Tab CA" accent={V.purple}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0" }}>
                   <Ring value={data.promedioStaffCA} min={-2} max={5} label="PROMEDIO" color={V.purple} size={160} />
@@ -736,7 +784,7 @@ function DashboardMain({ user, onLogout }) {
             const arr = Object.entries(agg).map(([Cliente, PagoRecibido]) => ({ Cliente, PagoRecibido })).sort((a, b) => b.PagoRecibido - a.PagoRecibido);
             return (<>
               <Metric label="Apoyo Comercial" value={fmtShort(sum(apoyo,"PagoRecibido"))} accent={V.cyan} sub={`${arr.length} clientes`} />
-              <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 18, marginTop: 18 }}>
+              <div className="grid-2-asym" style={{ marginTop: 18 }}>
                 <Panel title="Flujo Recuperado" accent={V.cyan} delay={80}><GlassTable columns={pagoCols} data={arr} accent={V.cyan} /></Panel>
                 <Panel title="Distribución Mensual" accent={V.cyan} delay={160}><MiniPie data={apoyo} /></Panel>
               </div>
