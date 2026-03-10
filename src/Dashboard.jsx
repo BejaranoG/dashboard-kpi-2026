@@ -31,6 +31,7 @@ const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto"
 const PIE_COLORS = ["#06d6a0","#ff6b6b","#4ecdc4","#ffd166","#a78bfa","#f472b6","#38bdf8","#fb923c","#34d399","#e879f9","#facc15","#67e8f9"];
 
 const TABS = [
+  { id: "kpis", label: "Resumen KPIs" },
   { id: "ingresos", label: "Ingresos / Salidas" },
   { id: "flujo", label: "Flujo Recuperado" },
   { id: "traspasos", label: "Traspasos" },
@@ -109,6 +110,153 @@ const DEFAULT = {
   promedioStaff: 0.08, promedioCalendario: 0.0, promedioStaffCA: -0.33,
   totales: { flujoRecibido:37976757.97,traspComercial:9,saldoComercial:13767980.53,traspJuridico:5,saldoJuridico:27415528.01 },
 };
+
+// ─── KPI DEFINITIONS & THRESHOLDS ───────────────────────────────────
+const KPI_DEFS = [
+  {
+    id: "flujo", title: "Flujo Recuperado", unit: "MDP",
+    description: "Meta anual de recuperación de flujo. Ref. 2024: $38.25M",
+    direction: "higher", target: 43, excede: 47.3,
+    thresholds: [
+      { level: "DEFICIENTE", max: 35, color: "#dc2626" },
+      { level: "NO CUMPLE", max: 38.25, color: "#f59e0b" },
+      { level: "CUMPLE", max: 43, color: "#6b7280" },
+      { level: "SOBRESALE", max: 45.15, color: "#3b82f6" },
+      { level: "EXCEDE", max: Infinity, color: "#22c55e" },
+    ],
+  },
+  {
+    id: "traspJuridico", title: "Traspasos a Jurídico", unit: "clientes",
+    description: "Enviar menos clientes a jurídico (menor es mejor)",
+    direction: "lower", target: 8,
+    thresholds: [
+      { level: "DEFICIENTE", min: 10, color: "#dc2626" },
+      { level: "NO CUMPLE", min: 9, color: "#f59e0b" },
+      { level: "CUMPLE", min: 8, color: "#6b7280" },
+      { level: "SOBRESALE", min: 7, color: "#3b82f6" },
+      { level: "EXCEDE", min: 0, color: "#22c55e" },
+    ],
+  },
+  {
+    id: "traspComercial", title: "Traspasos a Comercial", unit: "clientes",
+    description: "Enviar más clientes a comercial (mayor es mejor)",
+    direction: "higher", target: 9,
+    thresholds: [
+      { level: "DEFICIENTE", max: 7, color: "#dc2626" },
+      { level: "NO CUMPLE", max: 8, color: "#f59e0b" },
+      { level: "CUMPLE", max: 9, color: "#6b7280" },
+      { level: "SOBRESALE", max: 10, color: "#3b82f6" },
+      { level: "EXCEDE", max: Infinity, color: "#22c55e" },
+    ],
+  },
+  {
+    id: "apoyoComercial", title: "Apoyo a Comercial", unit: "MDP",
+    description: "Flujo recuperado en apoyo a comercial",
+    direction: "higher", target: 127, excede: 150,
+    thresholds: [
+      { level: "DEFICIENTE", max: 102, color: "#dc2626" },
+      { level: "NO CUMPLE", max: 115, color: "#f59e0b" },
+      { level: "CUMPLE", max: 127, color: "#6b7280" },
+      { level: "SOBRESALE", max: 150, color: "#3b82f6" },
+      { level: "EXCEDE", max: Infinity, color: "#22c55e" },
+    ],
+  },
+];
+
+function evaluateKPI(kpi, value) {
+  if (kpi.direction === "higher") {
+    for (const t of kpi.thresholds) { if (value <= t.max) return t; }
+    return kpi.thresholds[kpi.thresholds.length - 1];
+  } else {
+    for (const t of kpi.thresholds) { if (value >= t.min) return t; }
+    return kpi.thresholds[kpi.thresholds.length - 1];
+  }
+}
+
+function KPISemaforo({ kpi, value }) {
+  const status = evaluateKPI(kpi, value);
+  const isMoney = kpi.unit === "MDP";
+  const displayVal = isMoney ? `$${value.toFixed(2)}M` : value;
+  const targetVal = isMoney ? `$${kpi.target}M` : kpi.target;
+
+  let pct = 0;
+  if (kpi.direction === "higher") {
+    const maxVis = kpi.excede || kpi.target * 1.2;
+    pct = Math.min(1, Math.max(0, value / maxVis));
+  } else {
+    const worst = kpi.thresholds[0].min;
+    const best = kpi.thresholds[kpi.thresholds.length - 1].min || 0;
+    pct = Math.min(1, Math.max(0, 1 - (value - best) / (worst - best + 1)));
+  }
+
+  return (
+    <div className="fade-card" style={{ ...glassCard, padding: 0, overflow: "hidden" }}>
+      <div style={{ height: 3, background: status.color, boxShadow: `0 0 12px ${status.color}66` }} />
+      <div style={{ padding: "18px 20px 16px" }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 11, fontFamily: V.mono, color: V.textMuted, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, marginBottom: 3 }}>{kpi.title}</div>
+            <div style={{ fontSize: 11, color: V.textDim, lineHeight: 1.4 }}>{kpi.description}</div>
+          </div>
+          <div style={{
+            padding: "5px 12px", borderRadius: 20, fontSize: 10, fontFamily: V.mono,
+            fontWeight: 700, letterSpacing: 1, color: status.color,
+            background: `${status.color}18`, border: `1px solid ${status.color}33`, whiteSpace: "nowrap",
+          }}>{status.level}</div>
+        </div>
+        {/* Big value */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
+          <span style={{ fontSize: 30, fontFamily: V.mono, fontWeight: 800, color: status.color, lineHeight: 1 }}>{displayVal}</span>
+          <span style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>/ meta: {targetVal}{isMoney ? "" : ` ${kpi.unit}`}</span>
+        </div>
+        {/* Progress bar */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden", position: "relative" }}>
+            <div style={{
+              height: "100%", borderRadius: 4, width: `${pct * 100}%`,
+              background: `linear-gradient(90deg, ${status.color}88, ${status.color})`,
+              transition: "width 1s ease", boxShadow: `0 0 10px ${status.color}44`,
+            }} />
+            {kpi.direction === "higher" && (
+              <div style={{
+                position: "absolute", top: -3, height: 14, width: 2, background: V.text, opacity: 0.4,
+                left: `${(kpi.target / (kpi.excede || kpi.target * 1.2)) * 100}%`, borderRadius: 1,
+              }} />
+            )}
+          </div>
+        </div>
+        {/* Threshold scale */}
+        <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+          {kpi.thresholds.map((t, i) => {
+            const isActive = t.level === status.level;
+            let label = "";
+            if (kpi.direction === "higher") {
+              if (i === 0) label = `≤${t.max}`;
+              else if (t.max === Infinity) label = `>${kpi.thresholds[i - 1].max}`;
+              else label = `≤${t.max}`;
+            } else {
+              if (i === 0) label = `${t.min}+`;
+              else if (i === kpi.thresholds.length - 1) label = `≤${kpi.thresholds[i - 1].min - 1}`;
+              else label = `=${t.min}`;
+            }
+            return (
+              <div key={t.level} style={{
+                flex: 1, minWidth: 52, padding: "6px 3px", borderRadius: 6, textAlign: "center",
+                background: isActive ? `${t.color}20` : "rgba(255,255,255,0.02)",
+                border: `1px solid ${isActive ? t.color + "44" : "rgba(255,255,255,0.04)"}`,
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.color, margin: "0 auto 3px", boxShadow: isActive ? `0 0 8px ${t.color}88` : "none" }} />
+                <div style={{ fontSize: 7, fontFamily: V.mono, color: isActive ? t.color : V.textDim, fontWeight: 700, letterSpacing: 0.3, marginBottom: 1 }}>{t.level}</div>
+                <div style={{ fontSize: 9, fontFamily: V.mono, color: isActive ? V.text : V.textDim }}>{label}{isMoney ? "M" : ""}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const V = {
   bg: "#0a0e17", surface: "rgba(255,255,255,0.03)", glass: "rgba(255,255,255,0.05)",
@@ -444,7 +592,7 @@ export default function Dashboard() {
 }
 
 function DashboardMain({ user, onLogout }) {
-  const [tab, setTab] = useState("ingresos");
+  const [tab, setTab] = useState("kpis");
   const [meses, setMeses] = useState([]);  // empty = todos
   const [data, setData] = useState(DEFAULT);
   const [loading, setLoading] = useState(false);
@@ -654,6 +802,59 @@ function DashboardMain({ user, onLogout }) {
         {/* CONTENT */}
         <div className="content-pad" style={{ maxWidth: 1400, margin: "0 auto" }} key={tab + meses.join(",")}>
 
+          {/* ═══ RESUMEN KPIs ═══ */}
+          {tab === "kpis" && (() => {
+            // KPI values always use ALL data (annual targets, not filtered by month)
+            const allPagos = data.pagos;
+            const allApoyo = data.apoyoComercial;
+            const allTrasp = data.traspasos;
+            const flujoVal = allPagos.reduce((s, d) => s + (d.PagoRecibido || 0), 0) / 1e6;
+            const traspJurVal = allTrasp.filter(d => d.TipoTraspaso === "RS-JURIDICO").length;
+            const traspComVal = allTrasp.filter(d => d.TipoTraspaso === "RS-COMERCIAL").length;
+            const apoyoVal = allApoyo.reduce((s, d) => s + (d.PagoRecibido || 0), 0) / 1e6;
+            const kpiValues = { flujo: flujoVal, traspJuridico: traspJurVal, traspComercial: traspComVal, apoyoComercial: apoyoVal };
+
+            // Count statuses for summary
+            const statuses = KPI_DEFS.map(k => evaluateKPI(k, kpiValues[k.id]));
+            const excCount = statuses.filter(s => s.level === "EXCEDE").length;
+            const sobCount = statuses.filter(s => s.level === "SOBRESALE").length;
+            const cumCount = statuses.filter(s => s.level === "CUMPLE").length;
+            const badCount = statuses.filter(s => s.level === "NO CUMPLE" || s.level === "DEFICIENTE").length;
+
+            return (<>
+              {/* Summary banner */}
+              <div className="fade-card" style={{
+                ...glassCard, padding: "18px 24px", marginBottom: 22,
+                background: "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4 }}>Estado General KPIs 2025</div>
+                    <div style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>
+                      Evaluación acumulada del ejercicio en curso — datos anuales sin filtro de mes
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {[[excCount, "EXCEDE", "#22c55e"], [sobCount, "SOBRESALE", "#3b82f6"], [cumCount, "CUMPLE", "#6b7280"], [badCount, "ATENCIÓN", "#f59e0b"]].filter(([c]) => c > 0).map(([count, label, color]) => (
+                      <div key={label} style={{ textAlign: "center", padding: "6px 14px", borderRadius: 10, background: `${color}15`, border: `1px solid ${color}33` }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, fontFamily: V.mono, color }}>{count}</div>
+                        <div style={{ fontSize: 8, fontFamily: V.mono, fontWeight: 700, color, letterSpacing: 0.5 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI Cards */}
+              <div className="grid-2">
+                {KPI_DEFS.map(kpi => (
+                  <KPISemaforo key={kpi.id} kpi={kpi} value={kpiValues[kpi.id]} />
+                ))}
+              </div>
+            </>);
+          })()}
+
+          {/* ═══ INGRESOS / SALIDAS ═══ */}
           {tab === "ingresos" && (<>
             <div className="grid-4" style={{ marginBottom: 22 }}>
               <Metric label="Ing. Comercial" value={fmtShort(sum(ingCom,"SaldoNeto"))} accent={V.cyan} delay={0} sub={`${ingCom.length} clientes`} />
