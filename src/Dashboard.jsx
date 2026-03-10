@@ -268,33 +268,129 @@ export default function Dashboard() {
   const pagos = useMemo(() => byMes(data.pagos), [byMes, data.pagos]);
   const apoyo = useMemo(() => byMes(data.apoyoComercial), [byMes, data.apoyoComercial]);
 
-  async function fetchSheet(name) {
+  // Auto-extract spreadsheet ID from any URL or raw input
+  function extractId(input) {
+    const t = (input || "").trim();
+    // Full edit URL: /spreadsheets/d/REAL_ID/edit
+    const m1 = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})(?:\/|$|\?|#)/);
+    if (m1) return m1[1];
+    // Published URL with /d/e/2PACX-... → this is NOT the real ID
+    if (t.includes("/d/e/2PACX") || t.startsWith("2PACX")) return null;
+    // iframe embed code
+    const m2 = t.match(/src=["']https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/);
+    if (m2) return m2[1];
+    // Raw ID (no slashes, long enough)
+    if (/^[a-zA-Z0-9_-]{20,}$/.test(t)) return t;
+    return null;
+  }
+
+  async function fetchSheet(name, realId) {
+    const url = `https://docs.google.com/spreadsheets/d/${realId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
     try {
-      const res = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const rows = parseCSV(await res.text());
-      setFetchLog(p => [...p, `✓ ${name}: ${rows.length} filas`]); return rows;
-    } catch (e) { setFetchLog(p => [...p, `✗ ${name}: ${e.message}`]); return null; }
+      const res = await fetch(url);
+      const text = await res.text();
+      // Google returns HTML on errors (404, permission denied, etc.)
+      if (!res.ok || text.trimStart().startsWith("<!") || text.trimStart().startsWith("<html")) {
+        if (res.status === 401 || res.status === 403 || text.includes("not authorized"))
+          throw new Error("Sin permisos — comparte la hoja como 'Cualquier persona con el enlace'");
+        if (res.status === 404)
+          throw new Error("No encontrado — verifica el ID y que la hoja esté publicada");
+        throw new Error(`Error HTTP ${res.status} — verifica permisos y publicación`);
+      }
+      const rows = parseCSV(text);
+      setFetchLog(p => [...p, `✓ ${name}: ${rows.length} filas`]);
+      return rows;
+    } catch (e) {
+      const msg = e.message === "Failed to fetch" || e.message === "Load failed"
+        ? "No accesible — la hoja debe ser pública y estar publicada en la web"
+        : e.message;
+      setFetchLog(p => [...p, `✗ ${name}: ${msg}`]);
+      return null;
+    }
   }
 
   async function connect() {
-    if (!sheetId) return; setLoading(true); setFetchLog(["Conectando..."]);
+    if (!sheetId) return;
+    setLoading(true);
+    setFetchLog([]);
+
+    // 1. Extract real ID
+    const realId = extractId(sheetId);
+    if (!realId) {
+      if (sheetId.includes("2PACX")) {
+        setFetchLog(["✗ Ese es el link de PUBLICACIÓN, no el ID real.",
+          "",
+          "→ Abre tu Google Sheets en modo edición",
+          "→ La URL se ve así: docs.google.com/spreadsheets/d/XXXXXX/edit",
+          "→ Copia XXXXXX (lo que está entre /d/ y /edit)",
+          "",
+          "Tip: también puedes pegar la URL completa de edición"
+        ]);
+        setLoading(false);
+        return;
+      }
+      setFetchLog(["✗ No se pudo reconocer un ID válido.", "→ Pega la URL completa de tu Google Sheets o solo el ID"]);
+      setLoading(false);
+      return;
+    }
+
+    setFetchLog([`ID detectado: ${realId.substring(0, 12)}...`, "Verificando acceso..."]);
+
+    // 2. Test connection with one sheet first
+    const testUrl = `https://docs.google.com/spreadsheets/d/${realId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAMES.traspasos)}`;
+    try {
+      const testRes = await fetch(testUrl);
+      const testText = await testRes.text();
+      if (!testRes.ok || testText.trimStart().startsWith("<!") || testText.trimStart().startsWith("<html")) {
+        setFetchLog(p => [...p,
+          "",
+          "✗ No se puede acceder a la hoja. Verifica estos pasos:",
+          "",
+          "PASO 1 — Compartir:",
+          "  → Clic en 'Compartir' (botón verde)",
+          "  → Acceso general → 'Cualquier persona con el enlace'",
+          "  → Rol: Lector",
+          "",
+          "PASO 2 — Publicar:",
+          "  → Archivo → Compartir → Publicar en la web",
+          "  → Documento completo → Página web → Publicar",
+        ]);
+        setLoading(false);
+        return;
+      }
+    } catch (e) {
+      setFetchLog(p => [...p,
+        "",
+        `✗ Error de conexión: ${e.message === "Failed to fetch" || e.message === "Load failed" ? "No se pudo conectar" : e.message}`,
+        "",
+        "Causas posibles:",
+        "  → La hoja no es pública (Compartir → Cualquier persona con el enlace)",
+        "  → La hoja no está publicada (Archivo → Compartir → Publicar en la web)",
+        "  → Problema de red o CORS",
+      ]);
+      setLoading(false);
+      return;
+    }
+
+    setFetchLog(p => [...p, "✓ Acceso verificado. Cargando hojas..."]);
+
+    // 3. Fetch all sheets
     try {
       const nd = { ...DEFAULT };
-      const tr = await fetchSheet(SHEET_NAMES.traspasos);
+      const tr = await fetchSheet(SHEET_NAMES.traspasos, realId);
       if (tr) nd.traspasos = tr.filter(r => r["Tipo Traspaso"] && r["Cliente"]).map(r => ({ NumeroCliente: r["Numero Cliente"]||"", SaldoNeto: parseNum(r["Saldo Neto"]), TipoTraspaso: r["Tipo Traspaso"].trim(), Cliente: r["Cliente"].trim(), Mes: (r["Mes"]||"").toLowerCase().trim(), DiasImpago: parseNum(r["DIAS DE IMPAGO"]), SaldoImpago: parseNum(r["SALDO EN IMPAGO"]), DiasContacto: parseNum(r["Dias para contacto"]) }));
-      const pg = await fetchSheet(SHEET_NAMES.pagos);
+      const pg = await fetchSheet(SHEET_NAMES.pagos, realId);
       if (pg) nd.pagos = pg.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: (r["Mes"]||"").toLowerCase().trim() }));
-      const ap = await fetchSheet(SHEET_NAMES.apoyoComercial);
+      const ap = await fetchSheet(SHEET_NAMES.apoyoComercial, realId);
       if (ap) nd.apoyoComercial = ap.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: (r["Mes"]||"").toLowerCase().trim() }));
-      const ge = await fetchSheet(SHEET_NAMES.gastoExtrajudicial);
+      const ge = await fetchSheet(SHEET_NAMES.gastoExtrajudicial, realId);
       if (ge) nd.gastoExtrajudicial = ge.filter(r => r["Cliente"]).map(r => ({ Cliente: r["Cliente"].trim(), SaldoImpago: parseNum(r["Saldo en Impago"]), SaldoNeto: parseNum(r["Saldo Neto"]), Despacho: (r["Despacho"]||"").trim(), Honorario: parseNum(r["Honorario"]), MesNombre: (r["Mes Nombre"]||"").trim(), Pago: (r["Pago"]||"").trim() }));
-      const bs = await fetchSheet(SHEET_NAMES.bitacoraStaff); if (bs?.[0]?.["PROMEDIO"]) nd.promedioStaff = parseNum(bs[0]["PROMEDIO"]);
-      const ac = await fetchSheet(SHEET_NAMES.actividadesStaff); if (ac) { const a = ac.map(r => (r["ACTIVIDADES STAFF COBRANZA"]||Object.values(r)[0]||"").trim()).filter(x => x && x !== "ACTIVIDADES STAFF COBRANZA"); if (a.length) nd.actividades = a; }
-      const ca = await fetchSheet(SHEET_NAMES.calendarioCV); if (ca?.[0]?.["Resultado Promedio"]) nd.promedioCalendario = parseNum(ca[0]["Resultado Promedio"]);
-      const cb = await fetchSheet(SHEET_NAMES.bitacoraStaffCA); if (cb?.[0]?.["PROMEDIO"]) nd.promedioStaffCA = parseNum(cb[0]["PROMEDIO"]);
-      const to = await fetchSheet(SHEET_NAMES.totales); if (to?.[0]) nd.totales = { flujoRecibido: parseNum(to[0]["Flujo Recibido"]), traspComercial: parseNum(to[0]["Traspasos a Comercial"]), saldoComercial: parseNum(to[0]["Saldo Neto a Comercial"]), traspJuridico: parseNum(to[0]["Traspasos a Juridico"]), saldoJuridico: parseNum(to[0]["Saldo Neto a Juridico"]) };
-      setData(nd); setConnected(true); setFetchLog(p => [...p, "── conexión exitosa ──"]);
+      const bs = await fetchSheet(SHEET_NAMES.bitacoraStaff, realId); if (bs?.[0]?.["PROMEDIO"]) nd.promedioStaff = parseNum(bs[0]["PROMEDIO"]);
+      const ac = await fetchSheet(SHEET_NAMES.actividadesStaff, realId); if (ac) { const a = ac.map(r => (r["ACTIVIDADES STAFF COBRANZA"]||Object.values(r)[0]||"").trim()).filter(x => x && x !== "ACTIVIDADES STAFF COBRANZA"); if (a.length) nd.actividades = a; }
+      const ca = await fetchSheet(SHEET_NAMES.calendarioCV, realId); if (ca?.[0]?.["Resultado Promedio"]) nd.promedioCalendario = parseNum(ca[0]["Resultado Promedio"]);
+      const cb = await fetchSheet(SHEET_NAMES.bitacoraStaffCA, realId); if (cb?.[0]?.["PROMEDIO"]) nd.promedioStaffCA = parseNum(cb[0]["PROMEDIO"]);
+      const to = await fetchSheet(SHEET_NAMES.totales, realId); if (to?.[0]) nd.totales = { flujoRecibido: parseNum(to[0]["Flujo Recibido"]), traspComercial: parseNum(to[0]["Traspasos a Comercial"]), saldoComercial: parseNum(to[0]["Saldo Neto a Comercial"]), traspJuridico: parseNum(to[0]["Traspasos a Juridico"]), saldoJuridico: parseNum(to[0]["Saldo Neto a Juridico"]) };
+      setData(nd); setConnected(true); setFetchLog(p => [...p, "", "── conexión exitosa ──"]);
     } catch (e) { setFetchLog(p => [...p, `Error: ${e.message}`]); }
     setLoading(false);
   }
@@ -500,19 +596,37 @@ export default function Dashboard() {
           })()}
 
           {tab === "config" && (
-            <div style={{ maxWidth: 560, margin: "0 auto" }}>
+            <div style={{ maxWidth: 600, margin: "0 auto" }}>
               <Panel title="Conexión Google Sheets" accent={V.cyan}>
                 <div style={{ padding: 2 }}>
-                  {["Publica tu Google Sheets: Archivo → Compartir → Publicar en la web","Copia el ID del spreadsheet (entre /d/ y /edit)","Pégalo aquí y conecta"].map((s,i) => (
-                    <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, fontSize: 12, color: V.textMuted, lineHeight: 1.5 }}>
-                      <span style={{ fontFamily: V.mono, fontSize: 10, fontWeight: 700, color: V.cyan, minWidth: 16 }}>{i+1}.</span>{s}
+                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: "rgba(6,214,160,0.06)", border: `1px solid rgba(6,214,160,0.15)` }}>
+                    <div style={{ fontSize: 11, fontFamily: V.mono, fontWeight: 700, color: V.cyan, letterSpacing: 1, marginBottom: 10 }}>PASO 1 — COMPARTIR LA HOJA</div>
+                    <div style={{ fontSize: 12, color: V.textMuted, lineHeight: 1.6, marginLeft: 8 }}>
+                      Clic en <span style={{color:V.text}}>Compartir</span> (botón verde) → Acceso general → <span style={{color:V.cyan}}>Cualquier persona con el enlace</span> → Lector
                     </div>
-                  ))}
-                  <input type="text" value={sheetId} onChange={e => setSheetId(e.target.value)} placeholder="Spreadsheet ID..."
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 9, border: `1px solid ${V.glassBorder}`, background: "rgba(255,255,255,0.04)", color: V.text, fontSize: 12, fontFamily: V.mono, outline: "none", boxSizing: "border-box", marginBottom: 10 }}
+                  </div>
+                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: "rgba(56,189,248,0.06)", border: `1px solid rgba(56,189,248,0.15)` }}>
+                    <div style={{ fontSize: 11, fontFamily: V.mono, fontWeight: 700, color: V.blue, letterSpacing: 1, marginBottom: 10 }}>PASO 2 — PUBLICAR EN LA WEB</div>
+                    <div style={{ fontSize: 12, color: V.textMuted, lineHeight: 1.6, marginLeft: 8 }}>
+                      <span style={{color:V.text}}>Archivo</span> → Compartir → <span style={{color:V.blue}}>Publicar en la web</span> → Documento completo → Publicar
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: "rgba(167,139,250,0.06)", border: `1px solid rgba(167,139,250,0.15)` }}>
+                    <div style={{ fontSize: 11, fontFamily: V.mono, fontWeight: 700, color: V.purple, letterSpacing: 1, marginBottom: 10 }}>PASO 3 — PEGAR URL O ID</div>
+                    <div style={{ fontSize: 12, color: V.textMuted, lineHeight: 1.6, marginLeft: 8 }}>
+                      Puedes pegar la <span style={{color:V.text}}>URL completa</span> de tu hoja o solo el ID
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 6, fontSize: 11, fontFamily: V.mono, color: V.textDim }}>URL o Spreadsheet ID:</div>
+                  <input type="text" value={sheetId} onChange={e => setSheetId(e.target.value)}
+                    placeholder="Pega aquí la URL completa o el ID de tu Google Sheets..."
+                    style={{ width: "100%", padding: "11px 12px", borderRadius: 9, border: `1px solid ${V.glassBorder}`, background: "rgba(255,255,255,0.04)", color: V.text, fontSize: 12, fontFamily: V.mono, outline: "none", boxSizing: "border-box", marginBottom: 6 }}
                     onFocus={e => e.target.style.borderColor = V.cyan} onBlur={e => e.target.style.borderColor = V.glassBorder} />
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 5, letterSpacing: 1 }}>HOJAS REQUERIDAS:</div>
+                  <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 14, lineHeight: 1.5 }}>
+                    Ej: https://docs.google.com/spreadsheets/d/<span style={{color:V.cyan}}>10rg3pm...</span>/edit
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 5, letterSpacing: 1 }}>HOJAS REQUERIDAS EN TU GOOGLE SHEETS:</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                       {Object.values(SHEET_NAMES).map(n => <span key={n} style={{ fontSize: 10, fontFamily: V.mono, padding: "3px 7px", borderRadius: 5, background: "rgba(255,255,255,0.04)", color: V.textDim, border: `1px solid ${V.glassBorder}` }}>{n}</span>)}
                     </div>
@@ -521,8 +635,14 @@ export default function Dashboard() {
                     {loading ? "CONECTANDO..." : "CONECTAR"}
                   </button>
                   {fetchLog.length > 0 && (
-                    <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: `1px solid ${V.glassBorder}`, maxHeight: 160, overflowY: "auto" }}>
-                      {fetchLog.map((l,i) => <div key={i} style={{ fontSize: 10, fontFamily: V.mono, color: l.startsWith("✓") ? V.cyan : l.startsWith("✗") ? V.coral : V.textDim, padding: "2px 0" }}>{l}</div>)}
+                    <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: `1px solid ${V.glassBorder}`, maxHeight: 260, overflowY: "auto" }}>
+                      {fetchLog.map((l,i) => (
+                        <div key={i} style={{
+                          fontSize: 11, fontFamily: V.mono, padding: "2px 0", whiteSpace: "pre-wrap",
+                          color: l.startsWith("✓") ? V.cyan : l.startsWith("✗") ? V.coral : l.startsWith("→") ? V.amber : l.startsWith("PASO") ? V.blue : V.textDim,
+                          fontWeight: l.startsWith("✗") || l.startsWith("PASO") ? 600 : 400,
+                        }}>{l}</div>
+                      ))}
                     </div>
                   )}
                 </div>
