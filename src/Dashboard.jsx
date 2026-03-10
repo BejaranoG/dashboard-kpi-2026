@@ -38,7 +38,7 @@ const TABS = [
   { id: "bases", label: "Bases" },
   { id: "gastos", label: "Gastos" },
   { id: "apoyo", label: "Apoyo Comercial" },
-  { id: "config", label: "Config" },
+  { id: "info", label: "Info" },
 ];
 
 const DEFAULT = {
@@ -124,6 +124,7 @@ const CSS = `
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulseGlow{0%,100%{box-shadow:0 0 18px rgba(6,214,160,0.12)}50%{box-shadow:0 0 30px rgba(6,214,160,0.22)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .fade-card{animation:fadeUp 0.45s ease both}
 `;
 
@@ -396,14 +397,16 @@ export default function Dashboard() {
 
 function DashboardMain({ user, onLogout }) {
   const [tab, setTab] = useState("ingresos");
-  const [mes, setMes] = useState("todos");
+  const [meses, setMeses] = useState([]);  // empty = todos
   const [data, setData] = useState(DEFAULT);
-  const [sheetId, setSheetId] = useState("");
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
-  const [fetchLog, setFetchLog] = useState([]);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [mesDropdown, setMesDropdown] = useState(false);
 
-  const byMes = useCallback(arr => mes === "todos" ? arr : arr.filter(d => d.Mes && String(d.Mes).toLowerCase() === mes), [mes]);
+  const HARDCODED_SHEET_ID = "10rg3pmSvTFg5_4czZyzih03r_TCtqBmdNWWG_peuM84";
+
+  const byMes = useCallback(arr => meses.length === 0 ? arr : arr.filter(d => d.Mes && meses.includes(String(d.Mes).toLowerCase())), [meses]);
   const byTipo = useCallback(tipo => data.traspasos.filter(d => d.TipoTraspaso === tipo), [data]);
   const sum = (arr, k) => arr.reduce((s, d) => s + (d[k] || 0), 0);
 
@@ -414,132 +417,50 @@ function DashboardMain({ user, onLogout }) {
   const pagos = useMemo(() => byMes(data.pagos), [byMes, data.pagos]);
   const apoyo = useMemo(() => byMes(data.apoyoComercial), [byMes, data.apoyoComercial]);
 
-  // Auto-extract spreadsheet ID from any URL or raw input
-  function extractId(input) {
-    const t = (input || "").trim();
-    // Full edit URL: /spreadsheets/d/REAL_ID/edit
-    const m1 = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})(?:\/|$|\?|#)/);
-    if (m1) return m1[1];
-    // Published URL with /d/e/2PACX-... → this is NOT the real ID
-    if (t.includes("/d/e/2PACX") || t.startsWith("2PACX")) return null;
-    // iframe embed code
-    const m2 = t.match(/src=["']https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/);
-    if (m2) return m2[1];
-    // Raw ID (no slashes, long enough)
-    if (/^[a-zA-Z0-9_-]{20,}$/.test(t)) return t;
-    return null;
-  }
-
-  async function fetchSheet(name, realId) {
-    const url = `https://docs.google.com/spreadsheets/d/${realId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+  // ─── Data loading with hardcoded Sheet ID ───
+  async function fetchSheet(name) {
+    const url = `https://docs.google.com/spreadsheets/d/${HARDCODED_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
     try {
       const res = await fetch(url);
       const text = await res.text();
-      // Google returns HTML on errors (404, permission denied, etc.)
-      if (!res.ok || text.trimStart().startsWith("<!") || text.trimStart().startsWith("<html")) {
-        if (res.status === 401 || res.status === 403 || text.includes("not authorized"))
-          throw new Error("Sin permisos — comparte la hoja como 'Cualquier persona con el enlace'");
-        if (res.status === 404)
-          throw new Error("No encontrado — verifica el ID y que la hoja esté publicada");
-        throw new Error(`Error HTTP ${res.status} — verifica permisos y publicación`);
-      }
-      const rows = parseCSV(text);
-      setFetchLog(p => [...p, `✓ ${name}: ${rows.length} filas`]);
-      return rows;
-    } catch (e) {
-      const msg = e.message === "Failed to fetch" || e.message === "Load failed"
-        ? "No accesible — la hoja debe ser pública y estar publicada en la web"
-        : e.message;
-      setFetchLog(p => [...p, `✗ ${name}: ${msg}`]);
-      return null;
-    }
+      if (!res.ok || text.trimStart().startsWith("<!") || text.trimStart().startsWith("<html")) return null;
+      return parseCSV(text);
+    } catch { return null; }
   }
 
-  async function connect() {
-    if (!sheetId) return;
+  async function loadData() {
     setLoading(true);
-    setFetchLog([]);
-
-    // 1. Extract real ID
-    const realId = extractId(sheetId);
-    if (!realId) {
-      if (sheetId.includes("2PACX")) {
-        setFetchLog(["✗ Ese es el link de PUBLICACIÓN, no el ID real.",
-          "",
-          "→ Abre tu Google Sheets en modo edición",
-          "→ La URL se ve así: docs.google.com/spreadsheets/d/XXXXXX/edit",
-          "→ Copia XXXXXX (lo que está entre /d/ y /edit)",
-          "",
-          "Tip: también puedes pegar la URL completa de edición"
-        ]);
-        setLoading(false);
-        return;
-      }
-      setFetchLog(["✗ No se pudo reconocer un ID válido.", "→ Pega la URL completa de tu Google Sheets o solo el ID"]);
-      setLoading(false);
-      return;
-    }
-
-    setFetchLog([`ID detectado: ${realId.substring(0, 12)}...`, "Verificando acceso..."]);
-
-    // 2. Test connection with one sheet first
-    const testUrl = `https://docs.google.com/spreadsheets/d/${realId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAMES.traspasos)}`;
-    try {
-      const testRes = await fetch(testUrl);
-      const testText = await testRes.text();
-      if (!testRes.ok || testText.trimStart().startsWith("<!") || testText.trimStart().startsWith("<html")) {
-        setFetchLog(p => [...p,
-          "",
-          "✗ No se puede acceder a la hoja. Verifica estos pasos:",
-          "",
-          "PASO 1 — Compartir:",
-          "  → Clic en 'Compartir' (botón verde)",
-          "  → Acceso general → 'Cualquier persona con el enlace'",
-          "  → Rol: Lector",
-          "",
-          "PASO 2 — Publicar:",
-          "  → Archivo → Compartir → Publicar en la web",
-          "  → Documento completo → Página web → Publicar",
-        ]);
-        setLoading(false);
-        return;
-      }
-    } catch (e) {
-      setFetchLog(p => [...p,
-        "",
-        `✗ Error de conexión: ${e.message === "Failed to fetch" || e.message === "Load failed" ? "No se pudo conectar" : e.message}`,
-        "",
-        "Causas posibles:",
-        "  → La hoja no es pública (Compartir → Cualquier persona con el enlace)",
-        "  → La hoja no está publicada (Archivo → Compartir → Publicar en la web)",
-        "  → Problema de red o CORS",
-      ]);
-      setLoading(false);
-      return;
-    }
-
-    setFetchLog(p => [...p, "✓ Acceso verificado. Cargando hojas..."]);
-
-    // 3. Fetch all sheets
     try {
       const nd = { ...DEFAULT };
-      const tr = await fetchSheet(SHEET_NAMES.traspasos, realId);
+      const tr = await fetchSheet(SHEET_NAMES.traspasos);
       if (tr) nd.traspasos = tr.filter(r => r["Tipo Traspaso"] && r["Cliente"]).map(r => ({ NumeroCliente: r["Numero Cliente"]||"", SaldoNeto: parseNum(r["Saldo Neto"]), TipoTraspaso: r["Tipo Traspaso"].trim(), Cliente: r["Cliente"].trim(), Mes: (r["Mes"]||"").toLowerCase().trim(), DiasImpago: parseNum(r["DIAS DE IMPAGO"]), SaldoImpago: parseNum(r["SALDO EN IMPAGO"]), DiasContacto: parseNum(r["Dias para contacto"]) }));
-      const pg = await fetchSheet(SHEET_NAMES.pagos, realId);
+      const pg = await fetchSheet(SHEET_NAMES.pagos);
       if (pg) nd.pagos = pg.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: (r["Mes"]||"").toLowerCase().trim() }));
-      const ap = await fetchSheet(SHEET_NAMES.apoyoComercial, realId);
+      const ap = await fetchSheet(SHEET_NAMES.apoyoComercial);
       if (ap) nd.apoyoComercial = ap.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: (r["Mes"]||"").toLowerCase().trim() }));
-      const ge = await fetchSheet(SHEET_NAMES.gastoExtrajudicial, realId);
+      const ge = await fetchSheet(SHEET_NAMES.gastoExtrajudicial);
       if (ge) nd.gastoExtrajudicial = ge.filter(r => r["Cliente"]).map(r => ({ Cliente: r["Cliente"].trim(), SaldoImpago: parseNum(r["Saldo en Impago"]), SaldoNeto: parseNum(r["Saldo Neto"]), Despacho: (r["Despacho"]||"").trim(), Honorario: parseNum(r["Honorario"]), MesNombre: (r["Mes Nombre"]||"").trim(), Pago: (r["Pago"]||"").trim() }));
-      const bs = await fetchSheet(SHEET_NAMES.bitacoraStaff, realId); if (bs?.[0]?.["PROMEDIO"]) nd.promedioStaff = parseNum(bs[0]["PROMEDIO"]);
-      const ac = await fetchSheet(SHEET_NAMES.actividadesStaff, realId); if (ac) { const a = ac.map(r => (r["ACTIVIDADES STAFF COBRANZA"]||Object.values(r)[0]||"").trim()).filter(x => x && x !== "ACTIVIDADES STAFF COBRANZA"); if (a.length) nd.actividades = a; }
-      const ca = await fetchSheet(SHEET_NAMES.calendarioCV, realId); if (ca?.[0]?.["Resultado Promedio"]) nd.promedioCalendario = parseNum(ca[0]["Resultado Promedio"]);
-      const cb = await fetchSheet(SHEET_NAMES.bitacoraStaffCA, realId); if (cb?.[0]?.["PROMEDIO"]) nd.promedioStaffCA = parseNum(cb[0]["PROMEDIO"]);
-      const to = await fetchSheet(SHEET_NAMES.totales, realId); if (to?.[0]) nd.totales = { flujoRecibido: parseNum(to[0]["Flujo Recibido"]), traspComercial: parseNum(to[0]["Traspasos a Comercial"]), saldoComercial: parseNum(to[0]["Saldo Neto a Comercial"]), traspJuridico: parseNum(to[0]["Traspasos a Juridico"]), saldoJuridico: parseNum(to[0]["Saldo Neto a Juridico"]) };
-      setData(nd); setConnected(true); setFetchLog(p => [...p, "", "── conexión exitosa ──"]);
-    } catch (e) { setFetchLog(p => [...p, `Error: ${e.message}`]); }
+      const bs = await fetchSheet(SHEET_NAMES.bitacoraStaff); if (bs?.[0]?.["PROMEDIO"]) nd.promedioStaff = parseNum(bs[0]["PROMEDIO"]);
+      const ac = await fetchSheet(SHEET_NAMES.actividadesStaff); if (ac) { const a = ac.map(r => (r["ACTIVIDADES STAFF COBRANZA"]||Object.values(r)[0]||"").trim()).filter(x => x && x !== "ACTIVIDADES STAFF COBRANZA"); if (a.length) nd.actividades = a; }
+      const ca = await fetchSheet(SHEET_NAMES.calendarioCV); if (ca?.[0]?.["Resultado Promedio"]) nd.promedioCalendario = parseNum(ca[0]["Resultado Promedio"]);
+      const cb = await fetchSheet(SHEET_NAMES.bitacoraStaffCA); if (cb?.[0]?.["PROMEDIO"]) nd.promedioStaffCA = parseNum(cb[0]["PROMEDIO"]);
+      const to = await fetchSheet(SHEET_NAMES.totales); if (to?.[0]) nd.totales = { flujoRecibido: parseNum(to[0]["Flujo Recibido"]), traspComercial: parseNum(to[0]["Traspasos a Comercial"]), saldoComercial: parseNum(to[0]["Saldo Neto a Comercial"]), traspJuridico: parseNum(to[0]["Traspasos a Juridico"]), saldoJuridico: parseNum(to[0]["Saldo Neto a Juridico"]) };
+      setData(nd); setConnected(true);
+      setLastUpdate(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }));
+    } catch (e) { console.error(e); }
     setLoading(false);
   }
+
+  // Auto-load data on mount
+  useEffect(() => { loadData(); }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!mesDropdown) return;
+    const handler = () => setMesDropdown(false);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [mesDropdown]);
 
   const traspCols = [
     { key: "Mes", label: "Mes", nowrap: true },
@@ -580,10 +501,76 @@ function DashboardMain({ user, onLogout }) {
                   </div>
                 ))}
               </div>
-              <select value={mes} onChange={e => setMes(e.target.value)} style={{ padding: "6px 26px 6px 10px", borderRadius: 8, border: `1px solid ${V.glassBorder}`, background: V.glass, color: V.text, fontSize: 11, fontFamily: V.mono, fontWeight: 600, cursor: "pointer", appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='%2364748b'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 7px center" }}>
-                <option value="todos" style={{ background: V.bg }}>Todos</option>
-                {MESES.map(m => <option key={m} value={m} style={{ background: V.bg }}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
-              </select>
+              {/* Multi-month filter */}
+              <div style={{ position: "relative" }}>
+                <button onClick={(e) => { e.stopPropagation(); setMesDropdown(!mesDropdown); }} style={{
+                  padding: "6px 26px 6px 10px", borderRadius: 8, border: `1px solid ${V.glassBorder}`,
+                  background: V.glass, color: V.text, fontSize: 11, fontFamily: V.mono, fontWeight: 600,
+                  cursor: "pointer", appearance: "none",
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='%2364748b'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat", backgroundPosition: "right 7px center",
+                }}>
+                  {meses.length === 0 ? "Todos los meses" : meses.length === 1 ? meses[0].charAt(0).toUpperCase() + meses[0].slice(1) : `${meses.length} meses`}
+                </button>
+                {mesDropdown && (
+                  <div style={{
+                    position: "absolute", top: "100%", right: 0, marginTop: 4, zIndex: 50,
+                    ...glassCard, background: "rgba(15,20,30,0.95)", backdropFilter: "blur(20px)",
+                    padding: 6, minWidth: 180, maxHeight: 320, overflowY: "auto",
+                  }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => { setMeses([]); setMesDropdown(false); }} style={{
+                      width: "100%", padding: "7px 10px", background: meses.length === 0 ? `${V.cyan}22` : "transparent",
+                      border: "none", borderRadius: 6, color: meses.length === 0 ? V.cyan : V.textMuted,
+                      fontSize: 11, fontFamily: V.mono, fontWeight: 600, cursor: "pointer", textAlign: "left",
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}>
+                      <span style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${meses.length === 0 ? V.cyan : V.textDim}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: V.cyan, flexShrink: 0 }}>
+                        {meses.length === 0 ? "✓" : ""}
+                      </span>
+                      Todos
+                    </button>
+                    {MESES.map(m => {
+                      const active = meses.includes(m);
+                      return (
+                        <button key={m} onClick={() => {
+                          setMeses(prev => active ? prev.filter(x => x !== m) : [...prev, m]);
+                        }} style={{
+                          width: "100%", padding: "7px 10px", background: active ? `${V.cyan}15` : "transparent",
+                          border: "none", borderRadius: 6, color: active ? V.cyan : V.textMuted,
+                          fontSize: 11, fontFamily: V.mono, fontWeight: active ? 600 : 400, cursor: "pointer", textAlign: "left",
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}>
+                          <span style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${active ? V.cyan : V.textDim}`, background: active ? `${V.cyan}22` : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: V.cyan, flexShrink: 0 }}>
+                            {active ? "✓" : ""}
+                          </span>
+                          {m.charAt(0).toUpperCase() + m.slice(1)}
+                        </button>
+                      );
+                    })}
+                    {meses.length > 0 && (
+                      <button onClick={() => { setMeses([]); setMesDropdown(false); }} style={{
+                        width: "100%", padding: "6px 10px", marginTop: 4, background: "rgba(255,107,107,0.08)",
+                        border: `1px solid rgba(255,107,107,0.15)`, borderRadius: 6, color: V.coral,
+                        fontSize: 10, fontFamily: V.mono, fontWeight: 600, cursor: "pointer", textAlign: "center",
+                      }}>Limpiar filtro</button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {/* Refresh button */}
+              <button onClick={loadData} disabled={loading} title={lastUpdate ? `Última actualización: ${lastUpdate}` : "Cargar datos"} style={{
+                padding: "5px 10px", borderRadius: 8, border: `1px solid ${V.glassBorder}`,
+                background: loading ? "rgba(255,255,255,0.02)" : V.glass,
+                color: loading ? V.textDim : V.cyan, fontSize: 12, fontFamily: V.mono, fontWeight: 600,
+                cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5,
+                transition: "all 0.2s",
+              }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = "rgba(6,214,160,0.1)"; }}
+                onMouseLeave={e => e.currentTarget.style.background = loading ? "rgba(255,255,255,0.02)" : V.glass}
+              >
+                <span style={{ display: "inline-block", animation: loading ? "spin 1s linear infinite" : "none", fontSize: 13 }}>↻</span>
+                {loading ? "" : ""}
+              </button>
               <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 16, background: connected ? "rgba(6,214,160,0.1)" : "rgba(255,209,102,0.1)", border: `1px solid ${connected ? V.cyan : V.amber}33` }}>
                 <div style={{ width: 5, height: 5, borderRadius: "50%", background: connected ? V.cyan : V.amber, boxShadow: `0 0 5px ${connected ? V.cyan : V.amber}` }} />
                 <span style={{ fontSize: 9, fontFamily: V.mono, color: connected ? V.cyan : V.amber, fontWeight: 600 }}>{connected ? "LIVE" : "DEMO"}</span>
@@ -617,7 +604,7 @@ function DashboardMain({ user, onLogout }) {
         </nav>
 
         {/* CONTENT */}
-        <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }} key={tab + mes}>
+        <div style={{ padding: "24px 28px", maxWidth: 1400, margin: "0 auto" }} key={tab + meses.join(",")}>
 
           {tab === "ingresos" && (<>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 22 }}>
@@ -640,9 +627,9 @@ function DashboardMain({ user, onLogout }) {
             const total = sum(pagos, "PagoRecibido");
             return (<>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 22 }}>
-                <Metric label="Flujo Total" value={fmtShort(total)} accent={V.cyan} sub={`${arr.length} clientes`} />
-                <Metric label="Flujo 2024" value="$29.93M" accent={V.amber} delay={70} sub="Año anterior" />
-                <Metric label="Variación" value={`${((total/29930000-1)*100).toFixed(1)}%`} accent={total>29930000?V.cyan:V.coral} delay={140} sub="vs 2024" />
+                <Metric label="Flujo 2025" value={fmtShort(total)} accent={V.cyan} sub={`${arr.length} clientes`} />
+                <Metric label="Flujo 2024" value="$29.93M" accent={V.amber} delay={70} sub="Año anterior (referencia)" />
+                <Metric label="Variación vs 2024" value={`${total > 29930000 ? "+" : ""}${((total/29930000-1)*100).toFixed(1)}%`} accent={total>29930000?V.cyan:V.coral} delay={140} sub="Crecimiento interanual" />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 18 }}>
                 <Panel title="Detalle de Pagos" accent={V.cyan} delay={80}><GlassTable columns={pagoCols} data={arr} accent={V.cyan} /></Panel>
@@ -756,56 +743,42 @@ function DashboardMain({ user, onLogout }) {
             </>);
           })()}
 
-          {tab === "config" && (
+          {tab === "info" && (
             <div style={{ maxWidth: 600, margin: "0 auto" }}>
-              <Panel title="Conexión Google Sheets" accent={V.cyan}>
-                <div style={{ padding: 2 }}>
-                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: "rgba(6,214,160,0.06)", border: `1px solid rgba(6,214,160,0.15)` }}>
-                    <div style={{ fontSize: 11, fontFamily: V.mono, fontWeight: 700, color: V.cyan, letterSpacing: 1, marginBottom: 10 }}>PASO 1 — COMPARTIR LA HOJA</div>
-                    <div style={{ fontSize: 12, color: V.textMuted, lineHeight: 1.6, marginLeft: 8 }}>
-                      Clic en <span style={{color:V.text}}>Compartir</span> (botón verde) → Acceso general → <span style={{color:V.cyan}}>Cualquier persona con el enlace</span> → Lector
+              <Panel title="Estado de Conexión" accent={V.cyan}>
+                <div style={{ padding: 4 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: 14, borderRadius: 10, background: connected ? "rgba(6,214,160,0.06)" : "rgba(255,209,102,0.06)", border: `1px solid ${connected ? "rgba(6,214,160,0.15)" : "rgba(255,209,102,0.15)"}` }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: connected ? V.cyan : V.amber, boxShadow: `0 0 8px ${connected ? V.cyan : V.amber}66` }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: connected ? V.cyan : V.amber }}>{connected ? "Conectado a Google Sheets" : "Usando datos de demostración"}</div>
+                      {lastUpdate && <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginTop: 2 }}>Última actualización: {lastUpdate}</div>}
                     </div>
-                  </div>
-                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: "rgba(56,189,248,0.06)", border: `1px solid rgba(56,189,248,0.15)` }}>
-                    <div style={{ fontSize: 11, fontFamily: V.mono, fontWeight: 700, color: V.blue, letterSpacing: 1, marginBottom: 10 }}>PASO 2 — PUBLICAR EN LA WEB</div>
-                    <div style={{ fontSize: 12, color: V.textMuted, lineHeight: 1.6, marginLeft: 8 }}>
-                      <span style={{color:V.text}}>Archivo</span> → Compartir → <span style={{color:V.blue}}>Publicar en la web</span> → Documento completo → Publicar
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 10, background: "rgba(167,139,250,0.06)", border: `1px solid rgba(167,139,250,0.15)` }}>
-                    <div style={{ fontSize: 11, fontFamily: V.mono, fontWeight: 700, color: V.purple, letterSpacing: 1, marginBottom: 10 }}>PASO 3 — PEGAR URL O ID</div>
-                    <div style={{ fontSize: 12, color: V.textMuted, lineHeight: 1.6, marginLeft: 8 }}>
-                      Puedes pegar la <span style={{color:V.text}}>URL completa</span> de tu hoja o solo el ID
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: 6, fontSize: 11, fontFamily: V.mono, color: V.textDim }}>URL o Spreadsheet ID:</div>
-                  <input type="text" value={sheetId} onChange={e => setSheetId(e.target.value)}
-                    placeholder="Pega aquí la URL completa o el ID de tu Google Sheets..."
-                    style={{ width: "100%", padding: "11px 12px", borderRadius: 9, border: `1px solid ${V.glassBorder}`, background: "rgba(255,255,255,0.04)", color: V.text, fontSize: 12, fontFamily: V.mono, outline: "none", boxSizing: "border-box", marginBottom: 6 }}
-                    onFocus={e => e.target.style.borderColor = V.cyan} onBlur={e => e.target.style.borderColor = V.glassBorder} />
-                  <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 14, lineHeight: 1.5 }}>
-                    Ej: https://docs.google.com/spreadsheets/d/<span style={{color:V.cyan}}>10rg3pm...</span>/edit
                   </div>
                   <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 5, letterSpacing: 1 }}>HOJAS REQUERIDAS EN TU GOOGLE SHEETS:</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {Object.values(SHEET_NAMES).map(n => <span key={n} style={{ fontSize: 10, fontFamily: V.mono, padding: "3px 7px", borderRadius: 5, background: "rgba(255,255,255,0.04)", color: V.textDim, border: `1px solid ${V.glassBorder}` }}>{n}</span>)}
+                    <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 6, letterSpacing: 1 }}>FUENTE DE DATOS:</div>
+                    <div style={{ fontSize: 12, fontFamily: V.mono, color: V.textMuted, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${V.glassBorder}`, wordBreak: "break-all" }}>
+                      ID: {HARDCODED_SHEET_ID}
                     </div>
                   </div>
-                  <button onClick={connect} disabled={loading} style={{ width: "100%", padding: "11px", borderRadius: 9, border: "none", background: loading ? V.textDim : `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, color: V.bg, fontSize: 12, fontFamily: V.mono, fontWeight: 700, letterSpacing: 1, cursor: loading ? "not-allowed" : "pointer", boxShadow: loading ? "none" : `0 4px 18px ${V.cyan}33` }}>
-                    {loading ? "CONECTANDO..." : "CONECTAR"}
-                  </button>
-                  {fetchLog.length > 0 && (
-                    <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.02)", border: `1px solid ${V.glassBorder}`, maxHeight: 260, overflowY: "auto" }}>
-                      {fetchLog.map((l,i) => (
-                        <div key={i} style={{
-                          fontSize: 11, fontFamily: V.mono, padding: "2px 0", whiteSpace: "pre-wrap",
-                          color: l.startsWith("✓") ? V.cyan : l.startsWith("✗") ? V.coral : l.startsWith("→") ? V.amber : l.startsWith("PASO") ? V.blue : V.textDim,
-                          fontWeight: l.startsWith("✗") || l.startsWith("PASO") ? 600 : 400,
-                        }}>{l}</div>
-                      ))}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 6, letterSpacing: 1 }}>HOJAS VINCULADAS:</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {Object.values(SHEET_NAMES).map(n => <span key={n} style={{ fontSize: 10, fontFamily: V.mono, padding: "4px 8px", borderRadius: 5, background: connected ? "rgba(6,214,160,0.08)" : "rgba(255,255,255,0.04)", color: connected ? V.cyan : V.textDim, border: `1px solid ${connected ? "rgba(6,214,160,0.15)" : V.glassBorder}` }}>{n}</span>)}
                     </div>
-                  )}
+                  </div>
+                  <button onClick={loadData} disabled={loading} style={{
+                    width: "100%", padding: "11px", borderRadius: 9, border: "none",
+                    background: loading ? V.textDim : `linear-gradient(135deg, ${V.cyan}, ${V.blue})`,
+                    color: V.bg, fontSize: 12, fontFamily: V.mono, fontWeight: 700, letterSpacing: 1,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    boxShadow: loading ? "none" : `0 4px 18px ${V.cyan}33`,
+                  }}>
+                    {loading ? "ACTUALIZANDO..." : "↻  ACTUALIZAR DATOS"}
+                  </button>
+                  <div style={{ marginTop: 16, fontSize: 11, fontFamily: V.mono, color: V.textDim, lineHeight: 1.7 }}>
+                    <div style={{ fontWeight: 600, color: V.textMuted, marginBottom: 4 }}>Notas:</div>
+                    Los datos se cargan automáticamente al iniciar sesión. Usa el botón de actualizar (↻) en el header o aquí cuando hagas cambios en el Google Sheets.
+                  </div>
                 </div>
               </Panel>
             </div>
