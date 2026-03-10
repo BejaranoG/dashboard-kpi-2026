@@ -127,6 +127,136 @@ const CSS = `
 .fade-card{animation:fadeUp 0.45s ease both}
 `;
 
+// ─── AUTH SYSTEM ────────────────────────────────────────────────────
+const USERS = {
+  "gerardo.bejarano": { name: "Gerardo Bejarano", hash: "8f3d4a" },
+  "ramon.perez": { name: "Ramon Perez", hash: "8f3d4a" },
+  "scarlett.oregel": { name: "Scarlett Oregel", hash: "8f3d4a" },
+};
+// Simple hash for password check (not meant for banking-level security)
+function simpleHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+  return (h >>> 0).toString(16).slice(0, 6);
+}
+const PASS_HASH = simpleHash("rs2026!");
+
+function LoginScreen({ onLogin }) {
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [error, setError] = useState("");
+  const [shake, setShake] = useState(false);
+
+  function handleLogin(e) {
+    if (e) e.preventDefault();
+    const u = user.trim().toLowerCase();
+    const account = USERS[u];
+    if (!account) {
+      setError("Usuario no encontrado");
+      setShake(true); setTimeout(() => setShake(false), 500);
+      return;
+    }
+    if (simpleHash(pass) !== PASS_HASH) {
+      setError("Contraseña incorrecta");
+      setShake(true); setTimeout(() => setShake(false), 500);
+      return;
+    }
+    onLogin({ username: u, name: account.name });
+  }
+
+  return (
+    <div style={{ fontFamily: V.sans, background: V.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <style>{CSS}{`
+        @keyframes float1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-40px) scale(1.1); } }
+        @keyframes float2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-20px,30px) scale(1.05); } }
+        @keyframes shakeX { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-8px); } 40%,80% { transform: translateX(8px); } }
+        @keyframes typeIn { from { width: 0; } to { width: 100%; } }
+        .shake { animation: shakeX 0.4s ease; }
+      `}</style>
+
+      {/* Ambient orbs */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", top: "10%", left: "15%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,214,160,0.08) 0%, transparent 70%)", filter: "blur(80px)", animation: "float1 8s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", bottom: "5%", right: "10%", width: 450, height: 450, borderRadius: "50%", background: "radial-gradient(circle, rgba(56,189,248,0.06) 0%, transparent 70%)", filter: "blur(80px)", animation: "float2 10s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", top: "50%", left: "60%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(167,139,250,0.05) 0%, transparent 70%)", filter: "blur(60px)", animation: "float1 12s ease-in-out infinite reverse" }} />
+      </div>
+
+      {/* Grid pattern overlay */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", opacity: 0.03, backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`, backgroundSize: "60px 60px" }} />
+
+      {/* Login card */}
+      <div className={`fade-card ${shake ? "shake" : ""}`} style={{
+        ...glassCard, width: 400, padding: "0", position: "relative", zIndex: 1,
+        boxShadow: "0 8px 60px rgba(0,0,0,0.4), 0 0 40px rgba(6,214,160,0.06)",
+      }}>
+        {/* Top accent line */}
+        <div style={{ height: 2, background: `linear-gradient(90deg, ${V.cyan}, ${V.blue}, ${V.purple})` }} />
+
+        <div style={{ padding: "36px 32px 32px" }}>
+          {/* Logo */}
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 900, color: V.bg, boxShadow: `0 0 30px ${V.cyan}33`, marginBottom: 16 }}>K</div>
+            <h1 style={{ fontSize: 18, fontWeight: 800, color: V.text, letterSpacing: -0.3, margin: "0 0 4px" }}>KPI's Recuperación & Seguimiento</h1>
+            <p style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim, letterSpacing: 1.5, margin: 0 }}>ACCESO AL DASHBOARD</p>
+          </div>
+
+          {/* Form */}
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 10, fontFamily: V.mono, color: V.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>Usuario</label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 14, opacity: 0.4 }}>👤</span>
+                <input type="text" value={user} onChange={e => { setUser(e.target.value); setError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                  placeholder="nombre.apellido"
+                  style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 10, border: `1px solid ${error && !user ? V.coral + "88" : V.glassBorder}`, background: "rgba(255,255,255,0.04)", color: V.text, fontSize: 13, fontFamily: V.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
+                  onFocus={e => e.target.style.borderColor = V.cyan}
+                  onBlur={e => e.target.style.borderColor = V.glassBorder}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 10, fontFamily: V.mono, color: V.textMuted, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6, fontWeight: 600 }}>Contraseña</label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 14, opacity: 0.4 }}>🔒</span>
+                <input type="password" value={pass} onChange={e => { setPass(e.target.value); setError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                  placeholder="••••••"
+                  style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 10, border: `1px solid ${error && pass ? V.coral + "88" : V.glassBorder}`, background: "rgba(255,255,255,0.04)", color: V.text, fontSize: 13, fontFamily: V.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
+                  onFocus={e => e.target.style.borderColor = V.cyan}
+                  onBlur={e => e.target.style.borderColor = V.glassBorder}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 8, background: "rgba(255,107,107,0.08)", border: `1px solid rgba(255,107,107,0.2)`, fontSize: 12, fontFamily: V.mono, color: V.coral, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13 }}>⚠</span> {error}
+              </div>
+            )}
+
+            <button onClick={handleLogin} style={{
+              width: "100%", padding: "12px", borderRadius: 10, border: "none",
+              background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`,
+              color: V.bg, fontSize: 13, fontFamily: V.mono, fontWeight: 700,
+              letterSpacing: 1.5, cursor: "pointer", transition: "all 0.2s",
+              boxShadow: `0 4px 20px ${V.cyan}33`,
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 6px 28px ${V.cyan}44`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 20px ${V.cyan}33`; }}
+            >INICIAR SESIÓN</button>
+          </div>
+
+          <div style={{ marginTop: 20, textAlign: "center", fontSize: 10, fontFamily: V.mono, color: V.textDim, letterSpacing: 0.5 }}>
+            Acceso restringido • Solo personal autorizado
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Metric({ label, value, accent = V.cyan, delay = 0, sub }) {
   return (
     <div className="fade-card" style={{ ...glassCard, padding: "18px 22px", position: "relative", overflow: "hidden", animationDelay: `${delay}ms` }}>
@@ -249,6 +379,22 @@ function MiniPie({ data, valueKey = "PagoRecibido" }) {
 
 // ═══════════════════════════════════════════════════════════════════
 export default function Dashboard() {
+  const [authUser, setAuthUser] = useState(null);
+
+  function handleLogin(user) {
+    setAuthUser(user);
+  }
+
+  function handleLogout() {
+    setAuthUser(null);
+  }
+
+  if (!authUser) return <LoginScreen onLogin={handleLogin} />;
+
+  return <DashboardMain user={authUser} onLogout={handleLogout} />;
+}
+
+function DashboardMain({ user, onLogout }) {
   const [tab, setTab] = useState("ingresos");
   const [mes, setMes] = useState("todos");
   const [data, setData] = useState(DEFAULT);
@@ -441,6 +587,21 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 16, background: connected ? "rgba(6,214,160,0.1)" : "rgba(255,209,102,0.1)", border: `1px solid ${connected ? V.cyan : V.amber}33` }}>
                 <div style={{ width: 5, height: 5, borderRadius: "50%", background: connected ? V.cyan : V.amber, boxShadow: `0 0 5px ${connected ? V.cyan : V.amber}` }} />
                 <span style={{ fontSize: 9, fontFamily: V.mono, color: connected ? V.cyan : V.amber, fontWeight: 600 }}>{connected ? "LIVE" : "DEMO"}</span>
+              </div>
+              {/* User badge */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px 5px 12px", borderRadius: 20, background: "rgba(255,255,255,0.05)", border: `1px solid ${V.glassBorder}` }}>
+                <div style={{ width: 22, height: 22, borderRadius: "50%", background: `linear-gradient(135deg, ${V.purple}, ${V.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>
+                  {user.name.split(" ").map(n => n[0]).join("")}
+                </div>
+                <span style={{ fontSize: 10, fontFamily: V.mono, color: V.textMuted, fontWeight: 600 }}>{user.name}</span>
+                <button onClick={onLogout} title="Cerrar sesión" style={{
+                  background: "rgba(255,107,107,0.1)", border: `1px solid rgba(255,107,107,0.2)`,
+                  borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", fontSize: 10, color: V.coral, transition: "all 0.2s", padding: 0,
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,107,107,0.2)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,107,107,0.1)"; }}
+                >✕</button>
               </div>
             </div>
           </div>
