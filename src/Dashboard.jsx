@@ -196,7 +196,7 @@ function LoginScreen({ onLogin }) {
         <div style={{ padding: "36px 32px 32px" }}>
           {/* Logo */}
           <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 900, color: V.bg, boxShadow: `0 0 30px ${V.cyan}33`, marginBottom: 16 }}>K</div>
+            <div style={{ width: 56, height: 56, borderRadius: 14, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: V.bg, boxShadow: `0 0 30px ${V.cyan}33`, marginBottom: 16, letterSpacing: -1 }}>RS</div>
             <h1 style={{ fontSize: 18, fontWeight: 800, color: V.text, letterSpacing: -0.3, margin: "0 0 4px" }}>KPI's Recuperación & Seguimiento</h1>
             <p style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim, letterSpacing: 1.5, margin: 0 }}>ACCESO AL DASHBOARD</p>
           </div>
@@ -487,7 +487,7 @@ function DashboardMain({ user, onLogout }) {
         <header style={{ padding: "18px 28px", borderBottom: `1px solid ${V.glassBorder}`, backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 10, background: "rgba(10,14,23,0.85)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14, maxWidth: 1400, margin: "0 auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 900, color: V.bg, boxShadow: `0 0 18px ${V.cyan}44` }}>K</div>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: V.bg, boxShadow: `0 0 18px ${V.cyan}44`, letterSpacing: -0.5 }}>RS</div>
               <div>
                 <h1 style={{ fontSize: 16, fontWeight: 800, letterSpacing: -0.3, lineHeight: 1.2 }}>KPI's Recuperación & Seguimiento</h1>
                 <span style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, letterSpacing: 1 }}>DASHBOARD {new Date().getFullYear()}</span>
