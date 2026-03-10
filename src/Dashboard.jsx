@@ -115,7 +115,7 @@ const DEFAULT = {
 const KPI_DEFS = [
   {
     id: "flujo", title: "Flujo Recuperado", unit: "MDP",
-    description: "Meta anual de recuperación de flujo. Ref. 2024: $38.25M",
+    description: "Meta anual de recuperación de flujo. Ref. 2025: $38.25M",
     direction: "higher", target: 43, excede: 47.3,
     thresholds: [
       { level: "DEFICIENTE", max: 35, color: "#dc2626" },
@@ -260,7 +260,7 @@ function KPISemaforo({ kpi, value }) {
 
 const V = {
   bg: "#0a0e17", surface: "rgba(255,255,255,0.03)", glass: "rgba(255,255,255,0.05)",
-  glassBorder: "rgba(255,255,255,0.08)", text: "#e2e8f0", textMuted: "#64748b", textDim: "#475569",
+  glassBorder: "rgba(255,255,255,0.08)", text: "#e2e8f0", textMuted: "#94a3b8", textDim: "#7a8da3",
   cyan: "#06d6a0", coral: "#ff6b6b", amber: "#ffd166", purple: "#a78bfa", blue: "#38bdf8",
   mono: "'JetBrains Mono', 'Fira Code', monospace", sans: "'Outfit', sans-serif",
 };
@@ -829,9 +829,9 @@ function DashboardMain({ user, onLogout }) {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4 }}>Estado General KPIs 2025</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4 }}>Estado General KPIs 2026</div>
                     <div style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>
-                      Evaluación acumulada del ejercicio en curso — datos anuales sin filtro de mes
+                      Evaluación acumulada del ejercicio en curso — Ref. ejercicio anterior 2025
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
@@ -876,9 +876,9 @@ function DashboardMain({ user, onLogout }) {
             const total = sum(pagos, "PagoRecibido");
             return (<>
               <div className="grid-3" style={{ marginBottom: 22 }}>
-                <Metric label="Flujo 2025" value={fmtShort(total)} accent={V.cyan} sub={`${arr.length} clientes`} />
-                <Metric label="Flujo 2024" value="$29.93M" accent={V.amber} delay={70} sub="Año anterior (referencia)" />
-                <Metric label="Variación vs 2024" value={`${total > 29930000 ? "+" : ""}${((total/29930000-1)*100).toFixed(1)}%`} accent={total>29930000?V.cyan:V.coral} delay={140} sub="Crecimiento interanual" />
+                <Metric label="Flujo 2026" value={fmtShort(total)} accent={V.cyan} sub={`${arr.length} clientes`} />
+                <Metric label="Flujo 2025" value="$38.25M" accent={V.amber} delay={70} sub="Ejercicio anterior (referencia)" />
+                <Metric label="Variación vs 2025" value={`${total > 38250000 ? "+" : ""}${((total/38250000-1)*100).toFixed(1)}%`} accent={total>38250000?V.cyan:V.coral} delay={140} sub="Crecimiento interanual" />
               </div>
               <div className="grid-2-asym">
                 <Panel title="Detalle de Pagos" accent={V.cyan} delay={80}><GlassTable columns={pagoCols} data={arr} accent={V.cyan} /></Panel>
