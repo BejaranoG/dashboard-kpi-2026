@@ -42,73 +42,14 @@ const TABS = [
   { id: "info", label: "Info" },
 ];
 
-const DEFAULT = {
-  traspasos: [
-    { NumeroCliente:"9262",SaldoNeto:25802834.16,TipoTraspaso:"COMERCIAL-RS",Cliente:"EXPORTADORA SAN PABLO, S. DE R.L. DE C.V.",Mes:"mayo",DiasImpago:91,SaldoImpago:3387000,DiasContacto:0 },
-    { NumeroCliente:"9894",SaldoNeto:731279.84,TipoTraspaso:"COMERCIAL-RS",Cliente:"HMR REHABILITACION SAS DE CV",Mes:"enero",DiasImpago:25,SaldoImpago:109225.6,DiasContacto:2 },
-    { NumeroCliente:"10698",SaldoNeto:2985413.49,TipoTraspaso:"COMERCIAL-RS",Cliente:"MARICRUZ NAVARRETE",Mes:"enero",DiasImpago:146,SaldoImpago:1494072.67,DiasContacto:12 },
-    { NumeroCliente:"9027",SaldoNeto:1095014.5,TipoTraspaso:"JURIDICO-RS",Cliente:"DATILERA DON ROBERTO",Mes:"febrero",DiasImpago:0,SaldoImpago:0,DiasContacto:3 },
-    { NumeroCliente:"9970",SaldoNeto:526325,TipoTraspaso:"COMERCIAL-RS",Cliente:"ISRAEL ALBERTO PRINGLE LOMBERA",Mes:"febrero",DiasImpago:29,SaldoImpago:60052.25,DiasContacto:0 },
-    { NumeroCliente:"10607",SaldoNeto:1398000,TipoTraspaso:"COMERCIAL-RS",Cliente:"MARIO ESCALANTE LUGO",Mes:"febrero",DiasImpago:117,SaldoImpago:169974.09,DiasContacto:0 },
-    { NumeroCliente:"7796",SaldoNeto:2360434,TipoTraspaso:"COMERCIAL-RS",Cliente:"BELEN SANTILLAN SILVA",Mes:"abril",DiasImpago:108,SaldoImpago:131363.49,DiasContacto:0 },
-    { NumeroCliente:"10150",SaldoNeto:3664801.75,TipoTraspaso:"COMERCIAL-RS",Cliente:"FARM ROCK SOCIEDAD DE RESPONSABILIDAD LIMITADA",Mes:"abril",DiasImpago:156,SaldoImpago:670571.37,DiasContacto:0 },
-    { NumeroCliente:"10540",SaldoNeto:632000,TipoTraspaso:"JURIDICO-RS",Cliente:"PROYECTISTAS DE SERVICIOS SA DE CV",Mes:"marzo",DiasImpago:0,SaldoImpago:0,DiasContacto:0 },
-    { NumeroCliente:"9860",SaldoNeto:4400000,TipoTraspaso:"COMERCIAL-RS",Cliente:"INMOBIKSA SA DE CV",Mes:"junio",DiasImpago:0,SaldoImpago:0,DiasContacto:0 },
-    { NumeroCliente:"8100",SaldoNeto:5800434.88,TipoTraspaso:"COMERCIAL-RS",Cliente:"SOCIEDAD PEREZ",Mes:"septiembre",DiasImpago:0,SaldoImpago:0,DiasContacto:0 },
-    { NumeroCliente:"8500",SaldoNeto:3249472.91,TipoTraspaso:"RS-COMERCIAL",Cliente:"RAMON MARQUEZ MARTINEZ",Mes:"diciembre" },
-    { NumeroCliente:"7796",SaldoNeto:2294559.82,TipoTraspaso:"RS-COMERCIAL",Cliente:"BELEN SANTILLAN SILVA",Mes:"mayo" },
-    { NumeroCliente:"8427",SaldoNeto:2259746.2,TipoTraspaso:"RS-COMERCIAL",Cliente:"CAVAS VALMAR S DE R.L DE C.V",Mes:"junio" },
-    { NumeroCliente:"9400",SaldoNeto:2025071.81,TipoTraspaso:"RS-COMERCIAL",Cliente:"SERGIO GERARDO BALLESTEROS RESCE",Mes:"diciembre" },
-    { NumeroCliente:"10607",SaldoNeto:1200000,TipoTraspaso:"RS-COMERCIAL",Cliente:"MARIO ESCALANTE LUGO",Mes:"julio" },
-    { NumeroCliente:"9027",SaldoNeto:1089898.62,TipoTraspaso:"RS-COMERCIAL",Cliente:"DATILERA DON ROBERTO",Mes:"mayo" },
-    { NumeroCliente:"10200",SaldoNeto:1076231.17,TipoTraspaso:"RS-COMERCIAL",Cliente:"AGRICOLA 4 COYOTES",Mes:"mayo" },
-    { NumeroCliente:"10300",SaldoNeto:308000,TipoTraspaso:"RS-COMERCIAL",Cliente:"FRANCISCO JAVIER LOPEZ BRAMBILA",Mes:"julio" },
-    { NumeroCliente:"10540",SaldoNeto:265000,TipoTraspaso:"RS-COMERCIAL",Cliente:"PROYECTISTAS DE SERVICIOS SA DE CV",Mes:"julio" },
-    { NumeroCliente:"10900",SaldoNeto:13136000,TipoTraspaso:"RS-JURIDICO",Cliente:"JESUS ANTONIO SESMA ESCALANTE",Mes:"marzo" },
-    { NumeroCliente:"9860",SaldoNeto:4917373.61,TipoTraspaso:"RS-JURIDICO",Cliente:"INMOBIKSA SA DE CV",Mes:"octubre" },
-    { NumeroCliente:"10698",SaldoNeto:4618660.22,TipoTraspaso:"RS-JURIDICO",Cliente:"MARICRUZ NAVARRETE",Mes:"junio" },
-    { NumeroCliente:"10150",SaldoNeto:3794558.14,TipoTraspaso:"RS-JURIDICO",Cliente:"FARM ROCK SOCIEDAD DE RESPONSABILIDAD LIMITADA",Mes:"junio" },
-    { NumeroCliente:"10500",SaldoNeto:948936.04,TipoTraspaso:"RS-JURIDICO",Cliente:"MANUEL SIBRIAN MEZA",Mes:"septiembre" },
-  ],
-  pagos: [
-    { Cliente:"ECOHOGARES",PagoRecibido:6176592.33,Mes:"octubre" },{ Cliente:"Casfam S.A. de C.V.",PagoRecibido:5000000,Mes:"octubre" },
-    { Cliente:"EXPORTADORA SAN PABLO",PagoRecibido:4287012.74,Mes:"agosto" },{ Cliente:"ALTO PRODUCTOS",PagoRecibido:3767115.33,Mes:"septiembre" },
-    { Cliente:"VISION DESARROLLOS INMOBILIARIOS",PagoRecibido:3367382.48,Mes:"marzo" },{ Cliente:"Jeronimo Bertran Passani",PagoRecibido:3052665.08,Mes:"enero" },
-    { Cliente:"JORGE HUMBERTO JONES GARAY",PagoRecibido:1854865.27,Mes:"mayo" },{ Cliente:"RAMON MARQUEZ MARTINEZ",PagoRecibido:1134942.88,Mes:"febrero" },
-    { Cliente:"S.C.P. PESQUERA CALIFORNIA",PagoRecibido:1091566.06,Mes:"diciembre" },{ Cliente:"SEA URCHIN PACIFIC",PagoRecibido:947677.78,Mes:"julio" },
-    { Cliente:"BAJA RED",PagoRecibido:932592.8,Mes:"enero" },{ Cliente:"SM Invernaderos",PagoRecibido:764964.11,Mes:"marzo" },
-    { Cliente:"Mountain Side Ranch",PagoRecibido:703780,Mes:"mayo" },{ Cliente:"Roberto Carlos Rios Lizardi",PagoRecibido:530076.35,Mes:"febrero" },
-    { Cliente:"Interblinds",PagoRecibido:497032.71,Mes:"enero" },{ Cliente:"SERGIO GERARDO BALLESTEROS",PagoRecibido:466596.13,Mes:"diciembre" },
-    { Cliente:"AGROPRODUCTOS Y SERVICIOS",PagoRecibido:450000,Mes:"marzo" },
-  ],
-  apoyoComercial: [
-    { Cliente:"OFICEMART",PagoRecibido:61665581.28,Mes:"octubre" },{ Cliente:"PROCESADORA UOVO",PagoRecibido:10179646.64,Mes:"diciembre" },
-    { Cliente:"Credibroker",PagoRecibido:5221180.8,Mes:"noviembre" },{ Cliente:"FERNANDO BELTRAN RENDON",PagoRecibido:5000000,Mes:"septiembre" },
-    { Cliente:"INDUSTRIAS Y TARIMAS",PagoRecibido:4367575.38,Mes:"octubre" },{ Cliente:"FRANCISCO RUBEN ESQUER",PagoRecibido:2000000,Mes:"octubre" },
-    { Cliente:"FERNANDO BELTRAN RENDON",PagoRecibido:1241100,Mes:"enero" },{ Cliente:"MGS",PagoRecibido:1236450.78,Mes:"diciembre" },
-    { Cliente:"EMBALAJES DAMAR",PagoRecibido:873824.04,Mes:"noviembre" },{ Cliente:"ADMINISTRADORA DE INMUEBLES",PagoRecibido:651057.4,Mes:"septiembre" },
-    { Cliente:"ADEPRO",PagoRecibido:645078.05,Mes:"noviembre" },{ Cliente:"ANALITICA FREMEX",PagoRecibido:444190.82,Mes:"octubre" },
-  ],
-  gastoExtrajudicial: [
-    { Cliente:"VISION DESARROLLOS INMOBILIARIOS",SaldoImpago:1155892.04,SaldoNeto:5361269,Despacho:"CARLOS MENDOZA",Honorario:37451,MesNombre:"Febrero",Pago:"Cliente" },
-    { Cliente:"RAMON MARQUEZ MARTINEZ",SaldoImpago:280313.76,SaldoNeto:3402538,Despacho:"MIGUEL DUARTE",Honorario:15877.98,MesNombre:"Marzo",Pago:"Cliente" },
-    { Cliente:"OPERADORA DE BARES Y CANTINAS BAJA RED",SaldoImpago:232868.87,SaldoNeto:2360493,Despacho:"CARLOS MENDOZA",Honorario:12575,MesNombre:"Mayo",Pago:"Cliente" },
-    { Cliente:"SOCIEDAD PEREZ SPR DE RI",SaldoImpago:2580042.96,SaldoNeto:5790231.93,Despacho:"SERGIO A. CORRALES",Honorario:4499.99,MesNombre:"Agosto",Pago:"PK" },
-  ],
-  actividades: [
-    "SOLICITUD DE GASTOS DE NOTARIAS","SOLICITUD DE BUROS","ELABORACION DE CARTAS DE RETENCION",
-    "SOLICITUD DE CARTAS STP","CONTROL DE EXCEPCIONES","SOLICTUD DE LISTAS NEGRAS",
-    "SOLICITUD DE RUG","SOLICITUD DE RRPC","CAPTURAR DISPOSICIONES",
-    "SOLICITUD DE LIBERACION DE GARANTIA","SOLICITUD DE PAGOS A PROVEEDORES",
-    "ELABORACION DE SOLICITUD DE CREDITO","ELABORACION DE PAGARES",
-    "ELABORACION DE REPORTES DE VISITA","ELABORACION DE SOLICITUD DE ALTAS DE SIOFF",
-    "SOLICITUD DE ACTUALIZACIONES DE CLG","PASAR OPERACIONES","ELABORACION DE CHECKLIST",
-    "ELABORACION DE CARATULAS, HTYC, TABLA DE AMORTIZACION","ELABORACION DE CICS",
-    "ELABORACION DE CARTAS PAGO","SOLICUTUD DE RELACIONES PATRIMONIALES",
-    "SOLICITUD DE PAGOS ESPECIALES O LINEALES","REGISTRO DE PAGOS REPORTADOS","REGISTRO DE TRASPASOS",
-  ],
-  promedioStaff: 0.08, promedioCalendario: 0.0, promedioStaffCA: -0.33,
-  totales: { flujoRecibido:37976757.97,traspComercial:9,saldoComercial:13767980.53,traspJuridico:5,saldoJuridico:27415528.01 },
+const EMPTY_DATA = {
+  traspasos: [],
+  pagos: [],
+  apoyoComercial: [],
+  gastoExtrajudicial: [],
+  actividades: [],
+  promedioStaff: 0, promedioCalendario: 0, promedioStaffCA: 0,
+  totales: { flujoRecibido: 0, traspComercial: 0, saldoComercial: 0, traspJuridico: 0, saldoJuridico: 0 },
 };
 
 // ─── KPI DEFINITIONS & THRESHOLDS ───────────────────────────────────
@@ -594,8 +535,8 @@ export default function Dashboard() {
 function DashboardMain({ user, onLogout }) {
   const [tab, setTab] = useState("kpis");
   const [meses, setMeses] = useState([]);  // empty = todos
-  const [data, setData] = useState(DEFAULT);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState(EMPTY_DATA);
+  const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [mesDropdown, setMesDropdown] = useState(false);
@@ -627,7 +568,7 @@ function DashboardMain({ user, onLogout }) {
   async function loadData() {
     setLoading(true);
     try {
-      const nd = { ...DEFAULT };
+      const nd = { ...EMPTY_DATA };
       const tr = await fetchSheet(SHEET_NAMES.traspasos);
       if (tr) nd.traspasos = tr.filter(r => r["Tipo Traspaso"] && r["Cliente"]).map(r => ({ NumeroCliente: r["Numero Cliente"]||"", SaldoNeto: parseNum(r["Saldo Neto"]), TipoTraspaso: r["Tipo Traspaso"].trim(), Cliente: r["Cliente"].trim(), Mes: (r["Mes"]||"").toLowerCase().trim(), DiasImpago: parseNum(r["DIAS DE IMPAGO"]), SaldoImpago: parseNum(r["SALDO EN IMPAGO"]), DiasContacto: parseNum(r["Dias para contacto"]) }));
       const pg = await fetchSheet(SHEET_NAMES.pagos);
@@ -802,8 +743,17 @@ function DashboardMain({ user, onLogout }) {
         {/* CONTENT */}
         <div className="content-pad" style={{ maxWidth: 1400, margin: "0 auto" }} key={tab + meses.join(",")}>
 
+          {/* Loading overlay */}
+          {loading && !connected && (
+            <div className="fade-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 20px", textAlign: "center" }}>
+              <div style={{ fontSize: 28, marginBottom: 16, animation: "spin 1.5s linear infinite", display: "inline-block" }}>↻</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: V.text, marginBottom: 6 }}>Cargando datos...</div>
+              <div style={{ fontSize: 12, fontFamily: V.mono, color: V.textMuted }}>Conectando con Google Sheets</div>
+            </div>
+          )}
+
           {/* ═══ RESUMEN KPIs ═══ */}
-          {tab === "kpis" && (() => {
+          {tab === "kpis" && (!loading || connected) && (() => {
             // KPI values always use ALL data (annual targets, not filtered by month)
             const allPagos = data.pagos;
             const allApoyo = data.apoyoComercial;
@@ -855,7 +805,7 @@ function DashboardMain({ user, onLogout }) {
           })()}
 
           {/* ═══ INGRESOS / SALIDAS ═══ */}
-          {tab === "ingresos" && (<>
+          {tab === "ingresos" && (!loading || connected) && (<>
             <div className="grid-4" style={{ marginBottom: 22 }}>
               <Metric label="Ing. Comercial" value={fmtShort(sum(ingCom,"SaldoNeto"))} accent={V.cyan} delay={0} sub={`${ingCom.length} clientes`} />
               <Metric label="Ing. Jurídico" value={fmtShort(sum(ingJur,"SaldoNeto"))} accent={V.coral} delay={70} sub={`${ingJur.length} clientes`} />
@@ -870,7 +820,7 @@ function DashboardMain({ user, onLogout }) {
             </div>
           </>)}
 
-          {tab === "flujo" && (() => {
+          {tab === "flujo" && (!loading || connected) && (() => {
             const agg = {}; pagos.forEach(p => { agg[p.Cliente] = (agg[p.Cliente] || 0) + p.PagoRecibido; });
             const arr = Object.entries(agg).map(([Cliente, PagoRecibido]) => ({ Cliente, PagoRecibido })).sort((a, b) => b.PagoRecibido - a.PagoRecibido);
             const total = sum(pagos, "PagoRecibido");
@@ -887,7 +837,7 @@ function DashboardMain({ user, onLogout }) {
             </>);
           })()}
 
-          {tab === "traspasos" && (
+          {tab === "traspasos" && (!loading || connected) && (
             <div className="grid-2">
               <Panel title="Traspasos a Comercial" accent={V.blue}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0" }}>
@@ -918,7 +868,7 @@ function DashboardMain({ user, onLogout }) {
             </div>
           )}
 
-          {tab === "staff" && (
+          {tab === "staff" && (!loading || connected) && (
             <div className="grid-2">
               <Panel title="Tiempo Promedio — Tareas Staff" accent={V.amber}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0" }}>
@@ -939,7 +889,7 @@ function DashboardMain({ user, onLogout }) {
             </div>
           )}
 
-          {tab === "bases" && (
+          {tab === "bases" && (!loading || connected) && (
             <div className="grid-2">
               <Panel title="Bitácora Staff — Tab CA" accent={V.purple}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0" }}>
@@ -964,7 +914,7 @@ function DashboardMain({ user, onLogout }) {
             </div>
           )}
 
-          {tab === "gastos" && (<>
+          {tab === "gastos" && (!loading || connected) && (<>
             <Metric label="Total Honorarios" value={fmtShort(sum(data.gastoExtrajudicial,"Honorario"))} accent={V.cyan} sub={`${data.gastoExtrajudicial.length} registros`} />
             <div style={{ marginTop: 18 }}>
               <Panel title="Gastos por Cobranza Extrajudicial" accent={V.cyan} delay={80}>
@@ -980,7 +930,7 @@ function DashboardMain({ user, onLogout }) {
             </div>
           </>)}
 
-          {tab === "apoyo" && (() => {
+          {tab === "apoyo" && (!loading || connected) && (() => {
             const agg = {}; apoyo.forEach(p => { agg[p.Cliente] = (agg[p.Cliente] || 0) + p.PagoRecibido; });
             const arr = Object.entries(agg).map(([Cliente, PagoRecibido]) => ({ Cliente, PagoRecibido })).sort((a, b) => b.PagoRecibido - a.PagoRecibido);
             return (<>
