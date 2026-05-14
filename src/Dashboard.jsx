@@ -28,6 +28,20 @@ function fmt(n) { return new Intl.NumberFormat("es-MX", { minimumFractionDigits:
 function fmtShort(n) { if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`; if (Math.abs(n) >= 1e3) return `$${(n / 1e3).toFixed(1)}K`; return `$${fmt(n)}`; }
 
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const MES_ABREV = { ene: "enero", feb: "febrero", mar: "marzo", abr: "abril", may: "mayo", jun: "junio", jul: "julio", ago: "agosto", sep: "septiembre", sept: "septiembre", oct: "octubre", nov: "noviembre", dic: "diciembre" };
+
+function normalizeMes(v) {
+  if (v === null || v === undefined) return "";
+  const s = String(v).toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (!s) return "";
+  for (const m of MESES) { if (s.includes(m)) return m; }
+  for (const part of s.split(/[\s\-\/_.,]+/)) {
+    if (MES_ABREV[part]) return MES_ABREV[part];
+    const n = parseInt(part, 10);
+    if (n >= 1 && n <= 12 && /^\d+$/.test(part)) return MESES[n - 1];
+  }
+  return "";
+}
 const PIE_COLORS = ["#06d6a0","#ff6b6b","#4ecdc4","#ffd166","#a78bfa","#f472b6","#38bdf8","#fb923c","#34d399","#e879f9","#facc15","#67e8f9"];
 
 const TABS = [
@@ -69,12 +83,12 @@ const KPI_DEFS = [
   {
     id: "traspJuridico", title: "Traspasos a Jurídico", unit: "clientes",
     description: "Enviar menos clientes a jurídico (menor es mejor)",
-    direction: "lower", target: 8,
+    direction: "lower", target: 10,
     thresholds: [
-      { level: "DEFICIENTE", min: 10, color: "#dc2626" },
-      { level: "NO CUMPLE", min: 9, color: "#f59e0b" },
-      { level: "CUMPLE", min: 8, color: "#6b7280" },
-      { level: "SOBRESALE", min: 7, color: "#3b82f6" },
+      { level: "DEFICIENTE", min: 12, color: "#dc2626" },
+      { level: "NO CUMPLE", min: 11, color: "#f59e0b" },
+      { level: "CUMPLE", min: 10, color: "#6b7280" },
+      { level: "SOBRESALE", min: 9, color: "#3b82f6" },
       { level: "EXCEDE", min: 0, color: "#22c55e" },
     ],
   },
@@ -131,7 +145,7 @@ function KPISemaforo({ kpi, value }) {
   }
 
   return (
-    <div className="fade-card" style={{ ...glassCard, padding: 0, overflow: "hidden" }}>
+    <div className="fade-card" style={{ ...glassCard(), padding: 0, overflow: "hidden" }}>
       <div style={{ height: 3, background: status.color, boxShadow: `0 0 12px ${status.color}66` }} />
       <div style={{ padding: "18px 20px 16px" }}>
         {/* Header */}
@@ -153,7 +167,7 @@ function KPISemaforo({ kpi, value }) {
         </div>
         {/* Progress bar */}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden", position: "relative" }}>
+          <div style={{ height: 8, borderRadius: 4, background: V.progressTrack, overflow: "hidden", position: "relative" }}>
             <div style={{
               height: "100%", borderRadius: 4, width: `${pct * 100}%`,
               background: `linear-gradient(90deg, ${status.color}88, ${status.color})`,
@@ -184,8 +198,8 @@ function KPISemaforo({ kpi, value }) {
             return (
               <div key={t.level} style={{
                 flex: 1, minWidth: 52, padding: "6px 3px", borderRadius: 6, textAlign: "center",
-                background: isActive ? `${t.color}20` : "rgba(255,255,255,0.02)",
-                border: `1px solid ${isActive ? t.color + "44" : "rgba(255,255,255,0.04)"}`,
+                background: isActive ? `${t.color}20` : V.tableHeaderBg,
+                border: `1px solid ${isActive ? t.color + "44" : V.glassBorder}`,
               }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: t.color, margin: "0 auto 3px", boxShadow: isActive ? `0 0 8px ${t.color}88` : "none" }} />
                 <div style={{ fontSize: 7, fontFamily: V.mono, color: isActive ? t.color : V.textDim, fontWeight: 700, letterSpacing: 0.3, marginBottom: 1 }}>{t.level}</div>
@@ -199,18 +213,53 @@ function KPISemaforo({ kpi, value }) {
   );
 }
 
-const V = {
+const DARK_THEME = {
   bg: "#0a0e17", surface: "rgba(255,255,255,0.03)", glass: "rgba(255,255,255,0.05)",
   glassBorder: "rgba(255,255,255,0.08)", text: "#e2e8f0", textMuted: "#94a3b8", textDim: "#7a8da3",
   cyan: "#06d6a0", coral: "#ff6b6b", amber: "#ffd166", purple: "#a78bfa", blue: "#38bdf8",
   mono: "'JetBrains Mono', 'Fira Code', monospace", sans: "'Outfit', sans-serif",
+  headerBg: "rgba(10,14,23,0.85)", navBg: "rgba(10,14,23,0.5)",
+  dropdownBg: "rgba(15,20,30,0.95)", tooltipBg: "#1a1f2e",
+  inputBg: "rgba(255,255,255,0.04)", rowHover: "rgba(255,255,255,0.04)",
+  tableHeaderBg: "rgba(255,255,255,0.02)", scrollbarThumb: "rgba(255,255,255,0.1)",
+  gridLines: "rgba(255,255,255,0.1)", btnBg: "rgba(255,255,255,0.06)",
+  orbCyan: "rgba(6,214,160,0.06)", orbCoral: "rgba(255,107,107,0.05)",
+  orbBlue: "rgba(56,189,248,0.04)", orbPurple: "rgba(167,139,250,0.05)",
+  shadowStrong: "rgba(0,0,0,0.4)",
+  progressTrack: "rgba(255,255,255,0.06)",
+  surfaceSoft: "rgba(255,255,255,0.03)",
+  cardGradient: "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))",
 };
-const glassCard = { background: V.glass, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: `1px solid ${V.glassBorder}`, borderRadius: 16 };
+const LIGHT_THEME = {
+  bg: "#f4f6fb", surface: "rgba(0,0,0,0.025)", glass: "rgba(255,255,255,0.72)",
+  glassBorder: "rgba(15,23,42,0.08)", text: "#0f172a", textMuted: "#475569", textDim: "#64748b",
+  cyan: "#0d9488", coral: "#dc2626", amber: "#b45309", purple: "#7c3aed", blue: "#0369a1",
+  mono: "'JetBrains Mono', 'Fira Code', monospace", sans: "'Outfit', sans-serif",
+  headerBg: "rgba(244,246,251,0.85)", navBg: "rgba(244,246,251,0.7)",
+  dropdownBg: "rgba(255,255,255,0.98)", tooltipBg: "#ffffff",
+  inputBg: "rgba(15,23,42,0.04)", rowHover: "rgba(15,23,42,0.04)",
+  tableHeaderBg: "rgba(15,23,42,0.03)", scrollbarThumb: "rgba(15,23,42,0.18)",
+  gridLines: "rgba(15,23,42,0.08)", btnBg: "rgba(15,23,42,0.06)",
+  orbCyan: "rgba(13,148,136,0.10)", orbCoral: "rgba(220,38,38,0.07)",
+  orbBlue: "rgba(3,105,161,0.07)", orbPurple: "rgba(124,58,237,0.07)",
+  shadowStrong: "rgba(15,23,42,0.12)",
+  progressTrack: "rgba(15,23,42,0.08)",
+  surfaceSoft: "rgba(15,23,42,0.04)",
+  cardGradient: "linear-gradient(135deg, rgba(255,255,255,0.6), rgba(255,255,255,0.3))",
+};
+const INITIAL_THEME = (typeof window !== "undefined" && window.localStorage?.getItem("rs-theme") === "light") ? "light" : "dark";
+const V = { ...(INITIAL_THEME === "light" ? LIGHT_THEME : DARK_THEME) };
+function applyTheme(mode) { Object.assign(V, mode === "light" ? LIGHT_THEME : DARK_THEME); }
 
-const CSS = `
+function glassCard() {
+  return { background: V.glass, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: `1px solid ${V.glassBorder}`, borderRadius: 16 };
+}
+
+function getCSS() { return `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+body{background:${V.bg};color:${V.text};transition:background 0.3s ease,color 0.3s ease}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:${V.scrollbarThumb};border-radius:3px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulseGlow{0%,100%{box-shadow:0 0 18px rgba(6,214,160,0.12)}50%{box-shadow:0 0 30px rgba(6,214,160,0.22)}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
@@ -263,7 +312,7 @@ const CSS = `
   .hdr-pad{padding:10px 12px}
   .content-pad{padding:12px 10px}
 }
-`;
+`; }
 
 // ─── AUTH SYSTEM ────────────────────────────────────────────────────
 const USERS = {
@@ -304,7 +353,7 @@ function LoginScreen({ onLogin }) {
 
   return (
     <div style={{ fontFamily: V.sans, background: V.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
-      <style>{CSS}{`
+      <style>{getCSS()}{`
         @keyframes float1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-40px) scale(1.1); } }
         @keyframes float2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-20px,30px) scale(1.05); } }
         @keyframes shakeX { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-8px); } 40%,80% { transform: translateX(8px); } }
@@ -314,18 +363,18 @@ function LoginScreen({ onLogin }) {
 
       {/* Ambient orbs */}
       <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
-        <div style={{ position: "absolute", top: "10%", left: "15%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,214,160,0.08) 0%, transparent 70%)", filter: "blur(80px)", animation: "float1 8s ease-in-out infinite" }} />
-        <div style={{ position: "absolute", bottom: "5%", right: "10%", width: 450, height: 450, borderRadius: "50%", background: "radial-gradient(circle, rgba(56,189,248,0.06) 0%, transparent 70%)", filter: "blur(80px)", animation: "float2 10s ease-in-out infinite" }} />
-        <div style={{ position: "absolute", top: "50%", left: "60%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(167,139,250,0.05) 0%, transparent 70%)", filter: "blur(60px)", animation: "float1 12s ease-in-out infinite reverse" }} />
+        <div style={{ position: "absolute", top: "10%", left: "15%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${V.orbCyan} 0%, transparent 70%)`, filter: "blur(80px)", animation: "float1 8s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", bottom: "5%", right: "10%", width: 450, height: 450, borderRadius: "50%", background: `radial-gradient(circle, ${V.orbBlue} 0%, transparent 70%)`, filter: "blur(80px)", animation: "float2 10s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", top: "50%", left: "60%", width: 350, height: 350, borderRadius: "50%", background: `radial-gradient(circle, ${V.orbPurple} 0%, transparent 70%)`, filter: "blur(60px)", animation: "float1 12s ease-in-out infinite reverse" }} />
       </div>
 
       {/* Grid pattern overlay */}
-      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", opacity: 0.03, backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`, backgroundSize: "60px 60px" }} />
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none", opacity: 0.3, backgroundImage: `linear-gradient(${V.gridLines} 1px, transparent 1px), linear-gradient(90deg, ${V.gridLines} 1px, transparent 1px)`, backgroundSize: "60px 60px" }} />
 
       {/* Login card */}
       <div className={`fade-card login-card ${shake ? "shake" : ""}`} style={{
-        ...glassCard, padding: "0", position: "relative", zIndex: 1,
-        boxShadow: "0 8px 60px rgba(0,0,0,0.4), 0 0 40px rgba(6,214,160,0.06)",
+        ...glassCard(), padding: "0", position: "relative", zIndex: 1,
+        boxShadow: `0 8px 60px ${V.shadowStrong}, 0 0 40px ${V.orbCyan}`,
       }}>
         {/* Top accent line */}
         <div style={{ height: 2, background: `linear-gradient(90deg, ${V.cyan}, ${V.blue}, ${V.purple})` }} />
@@ -347,7 +396,7 @@ function LoginScreen({ onLogin }) {
                 <input type="text" value={user} onChange={e => { setUser(e.target.value); setError(""); }}
                   onKeyDown={e => e.key === "Enter" && handleLogin()}
                   placeholder="nombre.apellido"
-                  style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 10, border: `1px solid ${error && !user ? V.coral + "88" : V.glassBorder}`, background: "rgba(255,255,255,0.04)", color: V.text, fontSize: 13, fontFamily: V.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
+                  style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 10, border: `1px solid ${error && !user ? V.coral + "88" : V.glassBorder}`, background: V.inputBg, color: V.text, fontSize: 13, fontFamily: V.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
                   onFocus={e => e.target.style.borderColor = V.cyan}
                   onBlur={e => e.target.style.borderColor = V.glassBorder}
                 />
@@ -361,7 +410,7 @@ function LoginScreen({ onLogin }) {
                 <input type="password" value={pass} onChange={e => { setPass(e.target.value); setError(""); }}
                   onKeyDown={e => e.key === "Enter" && handleLogin()}
                   placeholder="••••••"
-                  style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 10, border: `1px solid ${error && pass ? V.coral + "88" : V.glassBorder}`, background: "rgba(255,255,255,0.04)", color: V.text, fontSize: 13, fontFamily: V.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
+                  style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 10, border: `1px solid ${error && pass ? V.coral + "88" : V.glassBorder}`, background: V.inputBg, color: V.text, fontSize: 13, fontFamily: V.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
                   onFocus={e => e.target.style.borderColor = V.cyan}
                   onBlur={e => e.target.style.borderColor = V.glassBorder}
                 />
@@ -397,7 +446,7 @@ function LoginScreen({ onLogin }) {
 
 function Metric({ label, value, accent = V.cyan, delay = 0, sub }) {
   return (
-    <div className="fade-card" style={{ ...glassCard, padding: "18px 22px", position: "relative", overflow: "hidden", animationDelay: `${delay}ms` }}>
+    <div className="fade-card" style={{ ...glassCard(), padding: "18px 22px", position: "relative", overflow: "hidden", animationDelay: `${delay}ms` }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }} />
       <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textMuted, letterSpacing: 2, textTransform: "uppercase", fontWeight: 600, marginBottom: 7 }}>{label}</div>
       <div style={{ fontSize: 26, fontFamily: V.mono, fontWeight: 700, color: accent, lineHeight: 1.1 }}>{value}</div>
@@ -423,13 +472,13 @@ function GlassTable({ columns, data, accent = V.cyan }) {
   const paged = sorted.slice(page * perPage, (page + 1) * perPage);
   const totalPages = Math.ceil(sorted.length / perPage);
   return (
-    <div style={{ ...glassCard, overflow: "hidden" }}>
+    <div style={{ ...glassCard(), overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr>
             {columns.map(col => (
               <th key={col.key} onClick={() => { setSortCol(col.key); setSortDir(sortCol === col.key && sortDir === "desc" ? "asc" : "desc"); }}
-                style={{ padding: "11px 14px", textAlign: col.align || "left", fontSize: 10, fontFamily: V.mono, fontWeight: 700, color: accent, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", userSelect: "none", borderBottom: `1px solid ${V.glassBorder}`, whiteSpace: "nowrap", background: "rgba(255,255,255,0.02)" }}>
+                style={{ padding: "11px 14px", textAlign: col.align || "left", fontSize: 10, fontFamily: V.mono, fontWeight: 700, color: accent, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", userSelect: "none", borderBottom: `1px solid ${V.glassBorder}`, whiteSpace: "nowrap", background: V.tableHeaderBg }}>
                 {col.label}{sortCol === col.key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
               </th>
             ))}
@@ -439,10 +488,10 @@ function GlassTable({ columns, data, accent = V.cyan }) {
               <tr><td colSpan={columns.length} style={{ padding: 28, textAlign: "center", color: V.textDim, fontFamily: V.mono, fontSize: 12 }}>— sin datos —</td></tr>
             ) : paged.map((row, i) => (
               <tr key={i} style={{ transition: "background 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                onMouseEnter={e => e.currentTarget.style.background = V.rowHover}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                 {columns.map(col => (
-                  <td key={col.key} style={{ padding: "9px 14px", borderBottom: "1px solid rgba(255,255,255,0.03)", fontSize: 12, fontFamily: col.mono ? V.mono : V.sans, fontWeight: col.mono ? 500 : 400, color: col.mono ? V.text : V.textMuted, textAlign: col.align || "left", whiteSpace: col.nowrap ? "nowrap" : "normal", maxWidth: col.maxW || "none", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <td key={col.key} style={{ padding: "9px 14px", borderBottom: `1px solid ${V.surfaceSoft}`, fontSize: 12, fontFamily: col.mono ? V.mono : V.sans, fontWeight: col.mono ? 500 : 400, color: col.mono ? V.text : V.textMuted, textAlign: col.align || "left", whiteSpace: col.nowrap ? "nowrap" : "normal", maxWidth: col.maxW || "none", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>
                 ))}
@@ -455,7 +504,7 @@ function GlassTable({ columns, data, accent = V.cyan }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 14px", borderTop: `1px solid ${V.glassBorder}` }}>
           <span style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>{page * perPage + 1}–{Math.min((page + 1) * perPage, sorted.length)} / {sorted.length}</span>
           <div style={{ display: "flex", gap: 4 }}>
-            {[["‹",-1],["›",1]].map(([s,d]) => <button key={s} onClick={() => setPage(p => Math.max(0,Math.min(totalPages-1,p+d)))} style={{ padding:"3px 9px",background:"rgba(255,255,255,0.06)",border:`1px solid ${V.glassBorder}`,borderRadius:6,color:V.textMuted,cursor:"pointer",fontSize:13,fontFamily:V.mono }}>{s}</button>)}
+            {[["‹",-1],["›",1]].map(([s,d]) => <button key={s} onClick={() => setPage(p => Math.max(0,Math.min(totalPages-1,p+d)))} style={{ padding:"3px 9px",background:V.btnBg,border:`1px solid ${V.glassBorder}`,borderRadius:6,color:V.textMuted,cursor:"pointer",fontSize:13,fontFamily:V.mono }}>{s}</button>)}
           </div>
         </div>
       )}
@@ -470,7 +519,7 @@ function Ring({ value, min, max, label, color = V.cyan, size = 140 }) {
   return (
     <div style={{ textAlign: "center" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} strokeDasharray={`${dashLen} ${circ}`} strokeLinecap="round" transform={`rotate(135 ${cx} ${cy})`} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={V.progressTrack} strokeWidth={stroke} strokeDasharray={`${dashLen} ${circ}`} strokeLinecap="round" transform={`rotate(135 ${cx} ${cy})`} />
         <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={`${filled} ${circ}`} strokeLinecap="round" transform={`rotate(135 ${cx} ${cy})`} style={{ transition: "stroke-dasharray 0.8s ease", filter: `drop-shadow(0 0 6px ${color}66)` }} />
         <text x={cx} y={cy - 4} textAnchor="middle" fontSize={20} fontFamily={V.mono} fontWeight="700" fill={color}>{typeof value === "number" ? value.toFixed(1) : value}</text>
         <text x={cx} y={cy + 14} textAnchor="middle" fontSize={8} fontFamily={V.mono} fontWeight="500" fill={V.textDim} letterSpacing="1">{label}</text>
@@ -481,7 +530,7 @@ function Ring({ value, min, max, label, color = V.cyan, size = 140 }) {
 
 function Panel({ title, accent = V.cyan, children, delay = 0 }) {
   return (
-    <div className="fade-card" style={{ ...glassCard, overflow: "hidden", animationDelay: `${delay}ms` }}>
+    <div className="fade-card" style={{ ...glassCard(), overflow: "hidden", animationDelay: `${delay}ms` }}>
       <div style={{ padding: "12px 18px", borderBottom: `1px solid ${V.glassBorder}`, display: "flex", alignItems: "center", gap: 9 }}>
         <div style={{ width: 7, height: 7, borderRadius: "50%", background: accent, boxShadow: `0 0 8px ${accent}88` }} />
         <h3 style={{ fontSize: 12, fontFamily: V.mono, fontWeight: 700, color: V.text, letterSpacing: 0.8, textTransform: "uppercase" }}>{title}</h3>
@@ -501,7 +550,7 @@ function MiniPie({ data, valueKey = "PagoRecibido" }) {
           <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} innerRadius={48} dataKey="value" paddingAngle={3} strokeWidth={0}>
             {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
           </Pie>
-          <Tooltip contentStyle={{ background: "#1a1f2e", border: `1px solid ${V.glassBorder}`, borderRadius: 10, fontFamily: V.mono, fontSize: 11, color: V.text }} formatter={v => fmtShort(v)} />
+          <Tooltip contentStyle={{ background: V.tooltipBg, border: `1px solid ${V.glassBorder}`, borderRadius: 10, fontFamily: V.mono, fontSize: 11, color: V.text }} formatter={v => fmtShort(v)} />
         </PieChart>
       </ResponsiveContainer>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7, justifyContent: "center", marginTop: 6 }}>
@@ -540,10 +589,29 @@ function DashboardMain({ user, onLogout }) {
   const [connected, setConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [mesDropdown, setMesDropdown] = useState(false);
+  const [themeMode, setThemeMode] = useState(INITIAL_THEME);
+
+  applyTheme(themeMode);
+  useEffect(() => {
+    try { window.localStorage?.setItem("rs-theme", themeMode); } catch {}
+    if (typeof document !== "undefined") {
+      document.body.classList.toggle("rs-light", themeMode === "light");
+      document.body.style.background = V.bg;
+      document.body.style.color = V.text;
+    }
+  }, [themeMode]);
+  const toggleTheme = useCallback(() => setThemeMode(m => m === "dark" ? "light" : "dark"), []);
 
   const HARDCODED_SHEET_ID = "10rg3pmSvTFg5_4czZyzih03r_TCtqBmdNWWG_peuM84";
 
-  const byMes = useCallback(arr => meses.length === 0 ? arr : arr.filter(d => d.Mes && meses.includes(String(d.Mes).toLowerCase())), [meses]);
+  const byMes = useCallback(arr => {
+    if (meses.length === 0) return arr;
+    const set = new Set(meses);
+    return arr.filter(d => {
+      const m = d.Mes || normalizeMes(d.MesNombre);
+      return m && set.has(m);
+    });
+  }, [meses]);
   const byTipo = useCallback(tipo => data.traspasos.filter(d => d.TipoTraspaso === tipo), [data]);
   const sum = (arr, k) => arr.reduce((s, d) => s + (d[k] || 0), 0);
 
@@ -553,6 +621,7 @@ function DashboardMain({ user, onLogout }) {
   const salJur = useMemo(() => byMes(byTipo("RS-JURIDICO")), [byMes, byTipo]);
   const pagos = useMemo(() => byMes(data.pagos), [byMes, data.pagos]);
   const apoyo = useMemo(() => byMes(data.apoyoComercial), [byMes, data.apoyoComercial]);
+  const gastos = useMemo(() => byMes(data.gastoExtrajudicial), [byMes, data.gastoExtrajudicial]);
 
   // ─── Data loading with hardcoded Sheet ID ───
   async function fetchSheet(name) {
@@ -570,13 +639,13 @@ function DashboardMain({ user, onLogout }) {
     try {
       const nd = { ...EMPTY_DATA };
       const tr = await fetchSheet(SHEET_NAMES.traspasos);
-      if (tr) nd.traspasos = tr.filter(r => r["Tipo Traspaso"] && r["Cliente"]).map(r => ({ NumeroCliente: r["Numero Cliente"]||"", SaldoNeto: parseNum(r["Saldo Neto"]), TipoTraspaso: r["Tipo Traspaso"].trim(), Cliente: r["Cliente"].trim(), Mes: (r["Mes"]||"").toLowerCase().trim(), DiasImpago: parseNum(r["DIAS DE IMPAGO"]), SaldoImpago: parseNum(r["SALDO EN IMPAGO"]), DiasContacto: parseNum(r["Dias para contacto"]) }));
+      if (tr) nd.traspasos = tr.filter(r => r["Tipo Traspaso"] && r["Cliente"]).map(r => ({ NumeroCliente: r["Numero Cliente"]||"", SaldoNeto: parseNum(r["Saldo Neto"]), TipoTraspaso: r["Tipo Traspaso"].trim(), Cliente: r["Cliente"].trim(), Mes: normalizeMes(r["Mes"]), DiasImpago: parseNum(r["DIAS DE IMPAGO"]), SaldoImpago: parseNum(r["SALDO EN IMPAGO"]), DiasContacto: parseNum(r["Dias para contacto"]) }));
       const pg = await fetchSheet(SHEET_NAMES.pagos);
-      if (pg) nd.pagos = pg.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: (r["Mes"]||"").toLowerCase().trim() }));
+      if (pg) nd.pagos = pg.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: normalizeMes(r["Mes"]) }));
       const ap = await fetchSheet(SHEET_NAMES.apoyoComercial);
-      if (ap) nd.apoyoComercial = ap.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: (r["Mes"]||"").toLowerCase().trim() }));
+      if (ap) nd.apoyoComercial = ap.filter(r => r["Cliente"]&&r["Pago Recibido"]).map(r => ({ Cliente: r["Cliente"].trim(), PagoRecibido: parseNum(r["Pago Recibido"]), Mes: normalizeMes(r["Mes"]) }));
       const ge = await fetchSheet(SHEET_NAMES.gastoExtrajudicial);
-      if (ge) nd.gastoExtrajudicial = ge.filter(r => r["Cliente"]).map(r => ({ Cliente: r["Cliente"].trim(), SaldoImpago: parseNum(r["Saldo en Impago"]), SaldoNeto: parseNum(r["Saldo Neto"]), Despacho: (r["Despacho"]||"").trim(), Honorario: parseNum(r["Honorario"]), MesNombre: (r["Mes Nombre"]||"").trim(), Pago: (r["Pago"]||"").trim() }));
+      if (ge) nd.gastoExtrajudicial = ge.filter(r => r["Cliente"]).map(r => ({ Cliente: r["Cliente"].trim(), SaldoImpago: parseNum(r["Saldo en Impago"]), SaldoNeto: parseNum(r["Saldo Neto"]), Despacho: (r["Despacho"]||"").trim(), Honorario: parseNum(r["Honorario"]), MesNombre: (r["Mes Nombre"]||"").trim(), Mes: normalizeMes(r["Mes Nombre"] || r["Mes"]), Pago: (r["Pago"]||"").trim() }));
       const bs = await fetchSheet(SHEET_NAMES.bitacoraStaff); if (bs?.[0]?.["PROMEDIO"]) nd.promedioStaff = parseNum(bs[0]["PROMEDIO"]);
       const ac = await fetchSheet(SHEET_NAMES.actividadesStaff); if (ac) { const a = ac.map(r => (r["ACTIVIDADES STAFF COBRANZA"]||Object.values(r)[0]||"").trim()).filter(x => x && x !== "ACTIVIDADES STAFF COBRANZA"); if (a.length) nd.actividades = a; }
       const ca = await fetchSheet(SHEET_NAMES.calendarioCV); if (ca?.[0]?.["Resultado Promedio"]) nd.promedioCalendario = parseNum(ca[0]["Resultado Promedio"]);
@@ -611,17 +680,17 @@ function DashboardMain({ user, onLogout }) {
 
   return (
     <div style={{ fontFamily: V.sans, background: V.bg, color: V.text, minHeight: "100vh", position: "relative" }}>
-      <style>{CSS}</style>
+      <style>{getCSS()}</style>
       {/* Ambient orbs */}
       <div style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
-        <div style={{ position: "absolute", top: "-20%", right: "-10%", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(6,214,160,0.06) 0%, transparent 70%)", filter: "blur(80px)" }} />
-        <div style={{ position: "absolute", bottom: "-15%", left: "-5%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,107,107,0.05) 0%, transparent 70%)", filter: "blur(80px)" }} />
-        <div style={{ position: "absolute", top: "40%", left: "50%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(56,189,248,0.04) 0%, transparent 70%)", filter: "blur(60px)" }} />
+        <div style={{ position: "absolute", top: "-20%", right: "-10%", width: 600, height: 600, borderRadius: "50%", background: `radial-gradient(circle, ${V.orbCyan} 0%, transparent 70%)`, filter: "blur(80px)" }} />
+        <div style={{ position: "absolute", bottom: "-15%", left: "-5%", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${V.orbCoral} 0%, transparent 70%)`, filter: "blur(80px)" }} />
+        <div style={{ position: "absolute", top: "40%", left: "50%", width: 400, height: 400, borderRadius: "50%", background: `radial-gradient(circle, ${V.orbBlue} 0%, transparent 70%)`, filter: "blur(60px)" }} />
       </div>
 
       <div style={{ position: "relative", zIndex: 1 }}>
         {/* HEADER */}
-        <header className="hdr-pad" style={{ borderBottom: `1px solid ${V.glassBorder}`, backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 10, background: "rgba(10,14,23,0.85)" }}>
+        <header className="hdr-pad" style={{ borderBottom: `1px solid ${V.glassBorder}`, backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 10, background: V.headerBg }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14, maxWidth: 1400, margin: "0 auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${V.cyan}, ${V.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: V.bg, boxShadow: `0 0 18px ${V.cyan}44`, letterSpacing: -0.5 }}>RS</div>
@@ -652,7 +721,7 @@ function DashboardMain({ user, onLogout }) {
                 {mesDropdown && (
                   <div style={{
                     position: "absolute", top: "100%", right: 0, marginTop: 4, zIndex: 50,
-                    ...glassCard, background: "rgba(15,20,30,0.95)", backdropFilter: "blur(20px)",
+                    ...glassCard(), background: V.dropdownBg, backdropFilter: "blur(20px)",
                     padding: 6, minWidth: 180, maxHeight: 320, overflowY: "auto",
                   }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => { setMeses([]); setMesDropdown(false); }} style={{
@@ -694,16 +763,27 @@ function DashboardMain({ user, onLogout }) {
                   </div>
                 )}
               </div>
+              {/* Theme toggle */}
+              <button onClick={toggleTheme} title={themeMode === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"} style={{
+                padding: "5px 10px", borderRadius: 8, border: `1px solid ${V.glassBorder}`,
+                background: V.glass, color: V.text, fontSize: 13, fontFamily: V.mono, fontWeight: 600,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 5, transition: "all 0.2s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = V.btnBg}
+                onMouseLeave={e => e.currentTarget.style.background = V.glass}
+              >
+                <span style={{ display: "inline-block", fontSize: 13, lineHeight: 1 }}>{themeMode === "dark" ? "☀" : "☾"}</span>
+              </button>
               {/* Refresh button */}
               <button onClick={loadData} disabled={loading} title={lastUpdate ? `Última actualización: ${lastUpdate}` : "Cargar datos"} style={{
                 padding: "5px 10px", borderRadius: 8, border: `1px solid ${V.glassBorder}`,
-                background: loading ? "rgba(255,255,255,0.02)" : V.glass,
+                background: loading ? V.tableHeaderBg : V.glass,
                 color: loading ? V.textDim : V.cyan, fontSize: 12, fontFamily: V.mono, fontWeight: 600,
                 cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5,
                 transition: "all 0.2s",
               }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = "rgba(6,214,160,0.1)"; }}
-                onMouseLeave={e => e.currentTarget.style.background = loading ? "rgba(255,255,255,0.02)" : V.glass}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = `${V.cyan}1a`; }}
+                onMouseLeave={e => e.currentTarget.style.background = loading ? V.tableHeaderBg : V.glass}
               >
                 <span style={{ display: "inline-block", animation: loading ? "spin 1s linear infinite" : "none", fontSize: 13 }}>↻</span>
                 {loading ? "" : ""}
@@ -713,7 +793,7 @@ function DashboardMain({ user, onLogout }) {
                 <span style={{ fontSize: 9, fontFamily: V.mono, color: connected ? V.cyan : V.amber, fontWeight: 600 }}>{connected ? "LIVE" : "DEMO"}</span>
               </div>
               {/* User badge */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px 5px 12px", borderRadius: 20, background: "rgba(255,255,255,0.05)", border: `1px solid ${V.glassBorder}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px 5px 12px", borderRadius: 20, background: V.glass, border: `1px solid ${V.glassBorder}` }}>
                 <div style={{ width: 22, height: 22, borderRadius: "50%", background: `linear-gradient(135deg, ${V.purple}, ${V.blue})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>
                   {user.name.split(" ").map(n => n[0]).join("")}
                 </div>
@@ -732,7 +812,7 @@ function DashboardMain({ user, onLogout }) {
         </header>
 
         {/* NAV */}
-        <nav className="nav-pad" style={{ borderBottom: `1px solid ${V.glassBorder}`, background: "rgba(10,14,23,0.5)", backdropFilter: "blur(10px)", position: "sticky", top: 56, zIndex: 9 }}>
+        <nav className="nav-pad" style={{ borderBottom: `1px solid ${V.glassBorder}`, background: V.navBg, backdropFilter: "blur(10px)", position: "sticky", top: 56, zIndex: 9 }}>
           <div className="nav-tabs" style={{ display: "flex", gap: 0, maxWidth: 1400, margin: "0 auto", overflowX: "auto" }}>
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "11px 16px", background: "none", border: "none", borderBottom: tab === t.id ? `2px solid ${V.cyan}` : "2px solid transparent", color: tab === t.id ? V.cyan : V.textDim, cursor: "pointer", fontSize: 11, fontFamily: V.mono, fontWeight: tab === t.id ? 700 : 500, letterSpacing: 0.5, whiteSpace: "nowrap", transition: "all 0.2s" }}>{t.label}</button>
@@ -774,8 +854,8 @@ function DashboardMain({ user, onLogout }) {
             return (<>
               {/* Summary banner */}
               <div className="fade-card" style={{
-                ...glassCard, padding: "18px 24px", marginBottom: 22,
-                background: "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))",
+                ...glassCard(), padding: "18px 24px", marginBottom: 22,
+                background: V.cardGradient,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
                   <div>
@@ -878,8 +958,8 @@ function DashboardMain({ user, onLogout }) {
               <Panel title="Actividades Staff Cobranza" accent={V.amber} delay={80}>
                 <div style={{ maxHeight: 360, overflowY: "auto", paddingRight: 3 }}>
                   {data.actividades.map((a, i) => (
-                    <div key={i} style={{ padding: "8px 10px", fontSize: 12, borderBottom: "1px solid rgba(255,255,255,0.03)", color: V.textMuted, display: "flex", alignItems: "center", gap: 9, transition: "background 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <div key={i} style={{ padding: "8px 10px", fontSize: 12, borderBottom: `1px solid ${V.surfaceSoft}`, color: V.textMuted, display: "flex", alignItems: "center", gap: 9, transition: "background 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.background = V.surfaceSoft} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                       <span style={{ fontFamily: V.mono, fontSize: 9, color: V.amber, fontWeight: 700, minWidth: 18 }}>{String(i+1).padStart(2,"0")}</span>{a}
                     </div>
                   ))}
@@ -904,7 +984,7 @@ function DashboardMain({ user, onLogout }) {
                 </Panel>
                 <Panel title="Bases de Datos R&S" accent="#94a3b8" delay={160}>
                   {["Reporte de Cartera Activa","Base de IMOR","Base de Traspaso a CV","Cuadro de Saldos"].map((b,i) => (
-                    <div key={i} style={{ padding: "7px 10px", marginBottom: 3, borderRadius: 7, background: "rgba(255,255,255,0.03)", fontSize: 11, fontFamily: V.mono, color: V.textMuted, display: "flex", alignItems: "center", gap: 7 }}>
+                    <div key={i} style={{ padding: "7px 10px", marginBottom: 3, borderRadius: 7, background: V.surfaceSoft, fontSize: 11, fontFamily: V.mono, color: V.textMuted, display: "flex", alignItems: "center", gap: 7 }}>
                       <span style={{ color: V.purple }}>›</span>{b}
                     </div>
                   ))}
@@ -915,7 +995,7 @@ function DashboardMain({ user, onLogout }) {
           )}
 
           {tab === "gastos" && (!loading || connected) && (<>
-            <Metric label="Total Honorarios" value={fmtShort(sum(data.gastoExtrajudicial,"Honorario"))} accent={V.cyan} sub={`${data.gastoExtrajudicial.length} registros`} />
+            <Metric label="Total Honorarios" value={fmtShort(sum(gastos,"Honorario"))} accent={V.cyan} sub={`${gastos.length} registros`} />
             <div style={{ marginTop: 18 }}>
               <Panel title="Gastos por Cobranza Extrajudicial" accent={V.cyan} delay={80}>
                 <GlassTable columns={[
@@ -925,7 +1005,7 @@ function DashboardMain({ user, onLogout }) {
                   { key: "Despacho", label: "Despacho" },
                   { key: "Honorario", label: "Honorario", align: "right", nowrap: true, mono: true, render: v => `$${fmt(v)}` },
                   { key: "Pago", label: "Pago", nowrap: true },
-                ]} data={data.gastoExtrajudicial} accent={V.cyan} />
+                ]} data={gastos} accent={V.cyan} />
               </Panel>
             </div>
           </>)}
@@ -955,14 +1035,14 @@ function DashboardMain({ user, onLogout }) {
                   </div>
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 6, letterSpacing: 1 }}>FUENTE DE DATOS:</div>
-                    <div style={{ fontSize: 12, fontFamily: V.mono, color: V.textMuted, padding: "8px 12px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${V.glassBorder}`, wordBreak: "break-all" }}>
+                    <div style={{ fontSize: 12, fontFamily: V.mono, color: V.textMuted, padding: "8px 12px", borderRadius: 8, background: V.surfaceSoft, border: `1px solid ${V.glassBorder}`, wordBreak: "break-all" }}>
                       ID: {HARDCODED_SHEET_ID}
                     </div>
                   </div>
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginBottom: 6, letterSpacing: 1 }}>HOJAS VINCULADAS:</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {Object.values(SHEET_NAMES).map(n => <span key={n} style={{ fontSize: 10, fontFamily: V.mono, padding: "4px 8px", borderRadius: 5, background: connected ? "rgba(6,214,160,0.08)" : "rgba(255,255,255,0.04)", color: connected ? V.cyan : V.textDim, border: `1px solid ${connected ? "rgba(6,214,160,0.15)" : V.glassBorder}` }}>{n}</span>)}
+                      {Object.values(SHEET_NAMES).map(n => <span key={n} style={{ fontSize: 10, fontFamily: V.mono, padding: "4px 8px", borderRadius: 5, background: connected ? `${V.cyan}15` : V.inputBg, color: connected ? V.cyan : V.textDim, border: `1px solid ${connected ? `${V.cyan}33` : V.glassBorder}` }}>{n}</span>)}
                     </div>
                   </div>
                   <button onClick={loadData} disabled={loading} style={{
