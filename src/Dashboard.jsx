@@ -823,6 +823,29 @@ function DashboardMain({ user, onLogout }) {
         {/* CONTENT */}
         <div className="content-pad" style={{ maxWidth: 1400, margin: "0 auto" }} key={tab + meses.join(",")}>
 
+          {/* Filter chips bar — visible across all tabs when filter is active */}
+          {meses.length > 0 && (
+            <div className="fade-card" style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 14px", borderRadius: 12, background: `${V.amber}10`, border: `1px solid ${V.amber}33` }}>
+              <span style={{ fontSize: 10, fontFamily: V.mono, fontWeight: 700, color: V.amber, letterSpacing: 1.2, textTransform: "uppercase" }}>
+                Filtrando por
+              </span>
+              {meses.map(m => (
+                <button key={m} onClick={() => setMeses(prev => prev.filter(x => x !== m))} title={`Quitar ${m}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px 3px 11px", borderRadius: 14, fontSize: 11, fontFamily: V.mono, fontWeight: 600, color: V.amber, background: `${V.amber}22`, border: `1px solid ${V.amber}55`, cursor: "pointer", transition: "all 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = `${V.amber}33`}
+                  onMouseLeave={e => e.currentTarget.style.background = `${V.amber}22`}
+                >
+                  {m.charAt(0).toUpperCase() + m.slice(1)} <span style={{ fontSize: 12, opacity: 0.8 }}>✕</span>
+                </button>
+              ))}
+              <button onClick={() => setMeses([])} style={{ marginLeft: "auto", padding: "3px 12px", borderRadius: 8, fontSize: 10, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.6, color: V.coral, background: "transparent", border: `1px solid ${V.coral}66`, cursor: "pointer", transition: "all 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = `${V.coral}15`}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                Limpiar
+              </button>
+            </div>
+          )}
+
           {/* Loading overlay */}
           {loading && !connected && (
             <div className="fade-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 20px", textAlign: "center" }}>
@@ -848,8 +871,6 @@ function DashboardMain({ user, onLogout }) {
             const cumCount = statuses.filter(s => s.level === "CUMPLE").length;
             const badCount = statuses.filter(s => s.level === "NO CUMPLE" || s.level === "DEFICIENTE").length;
 
-            const mesesLabel = filterActive ? meses.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(", ") : null;
-
             return (<>
               {/* Summary banner */}
               <div className="fade-card" style={{
@@ -858,16 +879,11 @@ function DashboardMain({ user, onLogout }) {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-                      Estado General KPIs 2026
-                      {filterActive && (
-                        <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 9, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.6, color: V.amber, background: `${V.amber}18`, border: `1px solid ${V.amber}44` }}>
-                          FILTRADO: {mesesLabel}
-                        </span>
-                      )}
+                    <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4 }}>
+                      {filterActive ? "KPIs del periodo seleccionado" : "Estado General KPIs 2026"}
                     </div>
                     <div style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>
-                      {filterActive ? "Valores del periodo seleccionado vs. metas anuales" : "Evaluación acumulada del ejercicio en curso — Ref. ejercicio anterior 2025"}
+                      {filterActive ? "Valores parciales vs. metas anuales — quita el filtro para ver acumulado" : "Evaluación acumulada del ejercicio en curso — Ref. ejercicio anterior 2025"}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
@@ -924,33 +940,31 @@ function DashboardMain({ user, onLogout }) {
           })()}
 
           {tab === "traspasos" && (!loading || connected) && (() => {
-            const filterActive = meses.length > 0;
-            const traspComCount = filterActive ? salCom.length : data.totales.traspComercial;
-            const traspJurCount = filterActive ? salJur.length : data.totales.traspJuridico;
-            const traspComSaldo = filterActive ? sum(salCom, "SaldoNeto") : data.totales.saldoComercial;
-            const traspJurSaldo = filterActive ? sum(salJur, "SaldoNeto") : data.totales.saldoJuridico;
-            const filterBadge = filterActive && (
-              <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 10, fontSize: 9, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.6, color: V.amber, background: `${V.amber}18`, border: `1px solid ${V.amber}44` }}>
-                {meses.length === 1 ? meses[0].toUpperCase() : `${meses.length} MESES`}
-              </span>
-            );
+            // Always derive from line-item data so the count matches reality even
+            // when the Totales sheet has empty/missing cells.
+            const traspComCount = salCom.length;
+            const traspJurCount = salJur.length;
+            const traspComSaldo = sum(salCom, "SaldoNeto");
+            const traspJurSaldo = sum(salJur, "SaldoNeto");
             return (
             <div className="grid-2">
-              <Panel title={<>Traspasos a Comercial{filterBadge}</>} accent={V.blue}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0" }}>
+              <Panel title="Traspasos a Comercial" accent={V.blue}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0", gap: 14, flexWrap: "wrap" }}>
                   <Ring value={traspComCount} min={0} max={Math.max(18, traspComCount + 2)} label="CLIENTES" color={V.blue} />
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, letterSpacing: 2, marginBottom: 5 }}>SALDO NETO</div>
                     <div style={{ fontSize: 22, fontFamily: V.mono, fontWeight: 700, color: V.blue }}>{fmtShort(traspComSaldo)}</div>
+                    <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginTop: 4 }}>{traspComCount} {traspComCount === 1 ? "cliente" : "clientes"}</div>
                   </div>
                 </div>
               </Panel>
-              <Panel title={<>Traspasos a Jurídico{filterBadge}</>} accent={V.coral} delay={80}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0" }}>
+              <Panel title="Traspasos a Jurídico" accent={V.coral} delay={80}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0", gap: 14, flexWrap: "wrap" }}>
                   <Ring value={traspJurCount} min={0} max={Math.max(12, traspJurCount + 2)} label="CLIENTES" color={V.coral} />
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, letterSpacing: 2, marginBottom: 5 }}>SALDO NETO</div>
                     <div style={{ fontSize: 22, fontFamily: V.mono, fontWeight: 700, color: V.coral }}>{fmtShort(traspJurSaldo)}</div>
+                    <div style={{ fontSize: 10, fontFamily: V.mono, color: V.textDim, marginTop: 4 }}>{traspJurCount} {traspJurCount === 1 ? "cliente" : "clientes"}</div>
                   </div>
                 </div>
               </Panel>
