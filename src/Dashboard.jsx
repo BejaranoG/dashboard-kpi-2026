@@ -834,14 +834,11 @@ function DashboardMain({ user, onLogout }) {
 
           {/* ═══ RESUMEN KPIs ═══ */}
           {tab === "kpis" && (!loading || connected) && (() => {
-            // KPI values always use ALL data (annual targets, not filtered by month)
-            const allPagos = data.pagos;
-            const allApoyo = data.apoyoComercial;
-            const allTrasp = data.traspasos;
-            const flujoVal = allPagos.reduce((s, d) => s + (d.PagoRecibido || 0), 0) / 1e6;
-            const traspJurVal = allTrasp.filter(d => d.TipoTraspaso === "RS-JURIDICO").length;
-            const traspComVal = allTrasp.filter(d => d.TipoTraspaso === "RS-COMERCIAL").length;
-            const apoyoVal = allApoyo.reduce((s, d) => s + (d.PagoRecibido || 0), 0) / 1e6;
+            const filterActive = meses.length > 0;
+            const flujoVal = sum(pagos, "PagoRecibido") / 1e6;
+            const traspJurVal = salJur.length;
+            const traspComVal = salCom.length;
+            const apoyoVal = sum(apoyo, "PagoRecibido") / 1e6;
             const kpiValues = { flujo: flujoVal, traspJuridico: traspJurVal, traspComercial: traspComVal, apoyoComercial: apoyoVal };
 
             // Count statuses for summary
@@ -851,6 +848,8 @@ function DashboardMain({ user, onLogout }) {
             const cumCount = statuses.filter(s => s.level === "CUMPLE").length;
             const badCount = statuses.filter(s => s.level === "NO CUMPLE" || s.level === "DEFICIENTE").length;
 
+            const mesesLabel = filterActive ? meses.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(", ") : null;
+
             return (<>
               {/* Summary banner */}
               <div className="fade-card" style={{
@@ -859,9 +858,16 @@ function DashboardMain({ user, onLogout }) {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4 }}>Estado General KPIs 2026</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                      Estado General KPIs 2026
+                      {filterActive && (
+                        <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 9, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.6, color: V.amber, background: `${V.amber}18`, border: `1px solid ${V.amber}44` }}>
+                          FILTRADO: {mesesLabel}
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>
-                      Evaluación acumulada del ejercicio en curso — Ref. ejercicio anterior 2025
+                      {filterActive ? "Valores del periodo seleccionado vs. metas anuales" : "Evaluación acumulada del ejercicio en curso — Ref. ejercicio anterior 2025"}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
@@ -917,23 +923,34 @@ function DashboardMain({ user, onLogout }) {
             </>);
           })()}
 
-          {tab === "traspasos" && (!loading || connected) && (
+          {tab === "traspasos" && (!loading || connected) && (() => {
+            const filterActive = meses.length > 0;
+            const traspComCount = filterActive ? salCom.length : data.totales.traspComercial;
+            const traspJurCount = filterActive ? salJur.length : data.totales.traspJuridico;
+            const traspComSaldo = filterActive ? sum(salCom, "SaldoNeto") : data.totales.saldoComercial;
+            const traspJurSaldo = filterActive ? sum(salJur, "SaldoNeto") : data.totales.saldoJuridico;
+            const filterBadge = filterActive && (
+              <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 10, fontSize: 9, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.6, color: V.amber, background: `${V.amber}18`, border: `1px solid ${V.amber}44` }}>
+                {meses.length === 1 ? meses[0].toUpperCase() : `${meses.length} MESES`}
+              </span>
+            );
+            return (
             <div className="grid-2">
-              <Panel title="Traspasos a Comercial" accent={V.blue}>
+              <Panel title={<>Traspasos a Comercial{filterBadge}</>} accent={V.blue}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0" }}>
-                  <Ring value={data.totales.traspComercial} min={10} max={18} label="RECORD COUNT" color={V.blue} />
+                  <Ring value={traspComCount} min={0} max={Math.max(18, traspComCount + 2)} label="CLIENTES" color={V.blue} />
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, letterSpacing: 2, marginBottom: 5 }}>SALDO NETO</div>
-                    <div style={{ fontSize: 22, fontFamily: V.mono, fontWeight: 700, color: V.blue }}>{fmtShort(data.totales.saldoComercial)}</div>
+                    <div style={{ fontSize: 22, fontFamily: V.mono, fontWeight: 700, color: V.blue }}>{fmtShort(traspComSaldo)}</div>
                   </div>
                 </div>
               </Panel>
-              <Panel title="Traspasos a Jurídico" accent={V.coral} delay={80}>
+              <Panel title={<>Traspasos a Jurídico{filterBadge}</>} accent={V.coral} delay={80}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", padding: "14px 0" }}>
-                  <Ring value={data.totales.traspJuridico} min={2} max={7} label="CLIENTES" color={V.coral} />
+                  <Ring value={traspJurCount} min={0} max={Math.max(12, traspJurCount + 2)} label="CLIENTES" color={V.coral} />
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, letterSpacing: 2, marginBottom: 5 }}>SALDO NETO</div>
-                    <div style={{ fontSize: 22, fontFamily: V.mono, fontWeight: 700, color: V.coral }}>{fmtShort(data.totales.saldoJuridico)}</div>
+                    <div style={{ fontSize: 22, fontFamily: V.mono, fontWeight: 700, color: V.coral }}>{fmtShort(traspJurSaldo)}</div>
                   </div>
                 </div>
               </Panel>
@@ -946,7 +963,8 @@ function DashboardMain({ user, onLogout }) {
                 </Panel>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {tab === "staff" && (!loading || connected) && (
             <div className="grid-2">
