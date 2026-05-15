@@ -28,6 +28,15 @@ git push -u origin main
 7. Clic en **"Deploy"**
 8. Una vez desplegado, ve a **Settings → Networking → Generate Domain** para obtener tu URL pública
 
+### 2b. Monta un Volume para persistir los ajustes de KPI
+
+Las metas/umbrales editables desde el tab **Ajustes** se guardan en disco. Sin Volume, los cambios se pierden en cada redeploy.
+
+1. Settings → **Volumes → New Volume**
+2. Mount path: `/data`
+3. Variables → agregar `DATA_DIR=/data`
+4. Redeploy
+
 ### 3. Conecta tu Google Sheets
 
 1. Abre tu Google Sheets
@@ -52,9 +61,13 @@ git push -u origin main
 
 ## Desarrollo local
 
+Necesitas dos procesos:
+
 ```bash
 npm install
-npm run dev
+npm run dev:server   # backend Express en :3000
+# en otra terminal:
+npm run dev          # Vite con HMR en :5173 (proxy-ea /api a :3000)
 ```
 
-Abre [http://localhost:3000](http://localhost:3000)
+Abre [http://localhost:5173](http://localhost:5173). Los ajustes de KPI se guardan en `./data/kpi-config.json` (carpeta gitignored).
