@@ -4,35 +4,47 @@ Guía para futuras sesiones de Claude Code en este repositorio.
 
 ## Resumen del proyecto
 
-Dashboard SPA en React + Vite que lee datos en vivo desde un Google Sheets público (vía endpoint `gviz/tq?tqx=out:csv`) y muestra los KPIs de Recuperación & Seguimiento para 2026. Despliegue en Railway con `npm run build` + `npm run start` (serve estático sobre el directorio `dist/`).
+Dashboard SPA en React + Vite que lee datos en vivo desde un Google Sheets público (vía endpoint `gviz/tq?tqx=out:csv`) y muestra los KPIs de Recuperación & Seguimiento para 2026. El backend es un Express mínimo (`server/index.js`) que sirve el `dist/` y expone `/api/kpi-config` para que cualquier usuario logueado pueda editar metas y umbrales desde el tab **Ajustes** sin tocar código. Despliegue en Railway con `npm run build` + `npm run start`.
 
 - ID del Sheet: harcodeado en `src/Dashboard.jsx` (`HARDCODED_SHEET_ID`). Para cambiar de hoja se edita esa constante.
 - El Sheet debe estar publicado en la web (`Archivo → Compartir → Publicar en la web`).
 - La pestaña de login usa hash simple (`simpleHash`) y la contraseña actual de todos los usuarios es `rs2026!`. No es seguridad real, solo gating visual.
+- La configuración editable de KPIs se persiste en disco como JSON en `${DATA_DIR}/kpi-config.json` + `kpi-history.json`. En Railway, monta un Volume y setea `DATA_DIR=/data` (sin esto, los cambios se pierden en cada redeploy).
 
 ## Comandos
 
 ```bash
-npm install        # instalar dependencias
-npm run dev        # servidor de desarrollo (Vite, puerto 5173 por default)
-npm run build      # build de producción a dist/
-npm run preview    # previsualizar dist/ localmente
-npm run start      # serve dist/ (usado por Railway, lee $PORT)
+npm install         # instalar dependencias
+npm run dev         # Vite dev server (puerto 5173). Necesita el backend corriendo aparte para /api/*
+npm run dev:server  # backend Express en :3000 (Vite proxy-ea /api → aquí)
+npm run build       # build de producción a dist/
+npm run preview     # previsualizar dist/ con Vite preview
+npm run start       # corre el backend Express, que sirve dist/ + /api/* (usado por Railway, lee $PORT)
 ```
+
+En desarrollo necesitas dos procesos: `npm run dev` (frontend con HMR) y en otra terminal `npm run dev:server` (backend). En producción es un solo proceso (`npm run start`).
 
 ## Arquitectura
 
-Solo hay dos archivos JS de aplicación:
+Tres piezas:
 
 - `src/main.jsx` — entrypoint, monta `<Dashboard />` en `#root`.
-- `src/Dashboard.jsx` — todo el dashboard (auth, fetch, parsing, UI, charts) en un solo archivo. Sección por sección, de arriba a abajo:
+- `src/Dashboard.jsx` — todo el dashboard (auth, fetch, parsing, UI, charts, editor de KPIs) en un solo archivo. Sección por sección, de arriba a abajo:
   1. `SHEET_NAMES`, helpers de CSV (`parseCSV`, `parseNum`, `fmt`, `fmtShort`).
   2. `normalizeMes` — normaliza nombres de mes (acentos, abreviaturas, números). **Todos los datos cargados pasan por aquí**; los filtros de mes asumen valores normalizados (`enero`...`diciembre`).
-  3. `KPI_DEFS` — definición de los 4 KPIs con umbrales por nivel (DEFICIENTE / NO CUMPLE / CUMPLE / SOBRESALE / EXCEDE). `direction: "lower"` invierte la lógica de comparación.
-  4. `DARK_THEME` / `LIGHT_THEME` / `V` — paleta de colores. `V` es un objeto mutable; `applyTheme(mode)` sobrescribe sus propiedades con el tema activo durante el render de `DashboardMain`.
-  5. `getCSS()` — CSS global que se inyecta inline (depende de `V`, por eso es función y no constante).
-  6. Componentes presentacionales: `KPISemaforo`, `LoginScreen`, `Metric`, `GlassTable`, `Ring`, `Panel`, `MiniPie`.
-  7. `Dashboard` (wrapper de auth) → `DashboardMain` (lógica real, fetch, tabs, filtros).
+  3. `KPI_DEFAULTS` — **valores base inmutables** de los 4 KPIs con umbrales por nivel (DEFICIENTE / NO CUMPLE / CUMPLE / SOBRESALE / EXCEDE). `direction: "lower"` invierte la lógica de comparación. Los valores vivos (meta + umbrales) se cargan en runtime desde `/api/kpi-config` y se mezclan sobre estos defaults con `mergeKpiConfig`. **Si tocas estos defaults, replica el cambio en `server/index.js`** (mismo array allí para fallback cuando no hay config persistida).
+  4. `evaluateKPI`, `cloneKpiDefs`, `mergeKpiConfig`, `validateKpiDraft` — helpers para el editor del tab Ajustes.
+  5. `DARK_THEME` / `LIGHT_THEME` / `V` — paleta de colores. `V` es un objeto mutable; `applyTheme(mode)` sobrescribe sus propiedades con el tema activo durante el render de `DashboardMain`.
+  6. `getCSS()` — CSS global que se inyecta inline (depende de `V`, por eso es función y no constante).
+  7. Componentes presentacionales: `KPISemaforo`, `LoginScreen`, `Metric`, `GlassTable`, `Ring`, `Panel`, `MiniPie`, `AjustesPanel`.
+  8. `Dashboard` (wrapper de auth) → `DashboardMain` (lógica real, fetch, tabs, filtros, state `kpiDefs`).
+- `server/index.js` — Express mínimo. Sirve `dist/` y expone:
+  - `GET /api/kpi-config` → config persistida (o defaults si nunca se guardó).
+  - `POST /api/kpi-config` → valida (campos numéricos, monotonicidad de umbrales) y persiste a `${DATA_DIR}/kpi-config.json` + agrega entrada al historial.
+  - `GET /api/kpi-history` → últimas 200 entradas con `at` (ISO timestamp), `by` (nombre del usuario logueado, best-effort) y `kpis` (snapshot).
+  - `GET /api/kpi-defaults` → devuelve los defaults base (no usado por el frontend actual, útil para debug).
+  - Solo se persisten campos editables (`target`, `excede`, valores de `thresholds`). Título, descripción, dirección, unidad y colores siempre vienen de `KPI_DEFAULTS`.
+  - `Infinity` no es JSON válido → se serializa como `null` y se reconvierte al cargar.
 
 ### Tema (light/dark)
 
@@ -77,5 +89,15 @@ Los nombres exactos de hoja están en `SHEET_NAMES`. Columnas críticas por hoja
 
 Railway autodetecta el proyecto. Confirmar:
 - Build: `npm run build`
-- Start: `npm run start`
-- Variable opcional: `PORT` (Railway la setea sola).
+- Start: `npm run start` (corre Express, sirve `dist/` + `/api/*`)
+- Variable `PORT`: Railway la setea sola.
+- **Variable `DATA_DIR`**: debe apuntar a un Railway Volume montado (ej. `/data`). Sin esto, `kpi-config.json` y `kpi-history.json` viven en el filesystem efímero del contenedor y se **borran en cada redeploy**.
+
+### Setup del Volume (una sola vez)
+
+1. En el proyecto de Railway, abrir el servicio → **Settings → Volumes → New Volume**.
+2. Mount path: `/data` (cualquiera, debe coincidir con `DATA_DIR`).
+3. En **Variables**, agregar `DATA_DIR=/data`.
+4. Redeploy.
+
+Si quieres seedear la config inicial sin tocar el dashboard, puedes hacer `railway run -- node -e "..."` o simplemente abrir el tab Ajustes, ajustar valores y guardar.

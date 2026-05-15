@@ -53,6 +53,7 @@ const TABS = [
   { id: "bases", label: "Bases" },
   { id: "gastos", label: "Gastos" },
   { id: "apoyo", label: "Apoyo Comercial" },
+  { id: "ajustes", label: "Ajustes" },
   { id: "info", label: "Info" },
 ];
 
@@ -67,7 +68,11 @@ const EMPTY_DATA = {
 };
 
 // ─── KPI DEFINITIONS & THRESHOLDS ───────────────────────────────────
-const KPI_DEFS = [
+// `KPI_DEFAULTS` is the immutable base. Live thresholds/targets are loaded
+// at runtime from `/api/kpi-config` (editable from the "Ajustes" tab) and
+// merged on top of these defaults — non-editable fields (title, description,
+// direction, unit, colors) always come from here.
+const KPI_DEFAULTS = [
   {
     id: "flujo", title: "Flujo Recuperado", unit: "MDP",
     description: "Meta anual de recuperación de flujo. Ref. 2025: $38.25M",
@@ -126,6 +131,76 @@ function evaluateKPI(kpi, value) {
     for (const t of kpi.thresholds) { if (value >= t.min) return t; }
     return kpi.thresholds[kpi.thresholds.length - 1];
   }
+}
+
+// Deep clone the defaults so callers can mutate freely.
+function cloneKpiDefs(defs) {
+  return defs.map(k => ({
+    ...k,
+    thresholds: k.thresholds.map(t => ({ ...t })),
+  }));
+}
+
+// Merge a remote config (from /api/kpi-config) on top of KPI_DEFAULTS.
+// Only editable fields (target, excede, threshold.max/min) are taken from
+// `remote`; everything else (title, colors, direction, unit, description)
+// always comes from defaults so a stale config can't corrupt them.
+function mergeKpiConfig(remote) {
+  return KPI_DEFAULTS.map(def => {
+    const patch = Array.isArray(remote) ? remote.find(k => k?.id === def.id) : null;
+    if (!patch) return { ...def, thresholds: def.thresholds.map(t => ({ ...t })) };
+    const merged = { ...def };
+    if (Number.isFinite(Number(patch.target))) merged.target = Number(patch.target);
+    if (def.excede !== undefined && Number.isFinite(Number(patch.excede))) {
+      merged.excede = Number(patch.excede);
+    }
+    merged.thresholds = def.thresholds.map((baseT, i) => {
+      const p = patch.thresholds?.[i];
+      const t = { ...baseT };
+      if (def.direction === "higher") {
+        if (i < def.thresholds.length - 1) {
+          const v = Number(p?.max);
+          if (Number.isFinite(v)) t.max = v;
+        } else {
+          t.max = Infinity;
+        }
+      } else {
+        const v = Number(p?.min);
+        if (Number.isFinite(v)) t.min = v;
+      }
+      return t;
+    });
+    return merged;
+  });
+}
+
+// Validate a draft locally before sending. Mirrors server validation so
+// we surface errors inline without a round-trip.
+function validateKpiDraft(draft) {
+  const errors = {};
+  for (const k of draft) {
+    const kErr = [];
+    if (!Number.isFinite(Number(k.target))) kErr.push("Meta inválida.");
+    const def = KPI_DEFAULTS.find(d => d.id === k.id);
+    if (def?.excede !== undefined && !Number.isFinite(Number(k.excede))) {
+      kErr.push("'Excede' inválido.");
+    }
+    if (k.direction === "higher") {
+      for (let i = 1; i < k.thresholds.length - 1; i++) {
+        const a = Number(k.thresholds[i - 1].max);
+        const b = Number(k.thresholds[i].max);
+        if (!(b > a)) { kErr.push(`Umbrales deben ser crecientes (${k.thresholds[i].level} ≤ ${k.thresholds[i - 1].level}).`); break; }
+      }
+    } else {
+      for (let i = 1; i < k.thresholds.length; i++) {
+        const a = Number(k.thresholds[i - 1].min);
+        const b = Number(k.thresholds[i].min);
+        if (!(b < a)) { kErr.push(`Umbrales deben ser decrecientes (${k.thresholds[i].level} ≥ ${k.thresholds[i - 1].level}).`); break; }
+      }
+    }
+    if (kErr.length) errors[k.id] = kErr;
+  }
+  return errors;
 }
 
 function KPISemaforo({ kpi, value }) {
@@ -564,6 +639,318 @@ function MiniPie({ data, valueKey = "PagoRecibido" }) {
   );
 }
 
+function AjustesPanel({ kpiDefs, configMeta, user, onSaved }) {
+  // Build an editable shape: numbers as strings so the user can type freely.
+  // The "max" of the last (EXCEDE) threshold for `higher` KPIs is never editable.
+  const toDraft = (defs) => defs.map(k => ({
+    id: k.id, title: k.title, description: k.description,
+    direction: k.direction, unit: k.unit,
+    target: String(k.target),
+    excede: k.excede !== undefined ? String(k.excede) : undefined,
+    thresholds: k.thresholds.map(t => ({
+      level: t.level,
+      color: t.color,
+      max: t.max === Infinity ? "" : (t.max !== undefined ? String(t.max) : ""),
+      min: t.min !== undefined ? String(t.min) : "",
+    })),
+  }));
+
+  const [draft, setDraft] = useState(() => toDraft(kpiDefs));
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState(null);  // { kind, text }
+  const [history, setHistory] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Reset draft when external kpiDefs changes (e.g. after save reloads from server)
+  useEffect(() => {
+    setDraft(toDraft(kpiDefs));
+    setDirty(false);
+  }, [kpiDefs]);
+
+  // Convert draft strings → numbers for validation/submission.
+  const numericDraft = useMemo(() => draft.map(k => ({
+    ...k,
+    target: Number(k.target),
+    excede: k.excede !== undefined ? Number(k.excede) : undefined,
+    thresholds: k.thresholds.map((t, i) => {
+      const isLastHigher = k.direction === "higher" && i === k.thresholds.length - 1;
+      return {
+        ...t,
+        max: isLastHigher ? Infinity : (k.direction === "higher" ? Number(t.max) : undefined),
+        min: k.direction === "lower" ? Number(t.min) : undefined,
+      };
+    }),
+  })), [draft]);
+
+  const errors = useMemo(() => validateKpiDraft(numericDraft), [numericDraft]);
+  const hasErrors = Object.keys(errors).length > 0;
+
+  const updateKpi = (id, patch) => {
+    setDraft(prev => prev.map(k => k.id === id ? { ...k, ...patch } : k));
+    setDirty(true);
+    setSaveMsg(null);
+  };
+  const updateThreshold = (id, idx, field, value) => {
+    setDraft(prev => prev.map(k => {
+      if (k.id !== id) return k;
+      const thresholds = k.thresholds.map((t, i) => i === idx ? { ...t, [field]: value } : t);
+      return { ...k, thresholds };
+    }));
+    setDirty(true);
+    setSaveMsg(null);
+  };
+
+  const resetToDefaults = () => {
+    if (!confirm("¿Restablecer todas las métricas a sus valores por defecto? (Se enviarán al servidor al guardar.)")) return;
+    setDraft(toDraft(cloneKpiDefs(KPI_DEFAULTS)));
+    setDirty(true);
+    setSaveMsg(null);
+  };
+
+  const reloadFromServer = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/kpi-config");
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error cargando");
+      onSaved({ kpis: mergeKpiConfig(j.kpis), meta: { updatedAt: j.updatedAt, updatedBy: j.updatedBy } });
+      setSaveMsg({ kind: "ok", text: "Recargado desde el servidor." });
+    } catch (e) {
+      setSaveMsg({ kind: "err", text: e.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const save = async () => {
+    if (hasErrors) {
+      setSaveMsg({ kind: "err", text: "Hay errores de validación. Corrige antes de guardar." });
+      return;
+    }
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      // Build the payload: only id + editable fields. Server enforces shape.
+      const payload = {
+        updatedBy: user?.name || null,
+        kpis: numericDraft.map(k => ({
+          id: k.id,
+          target: k.target,
+          ...(k.excede !== undefined ? { excede: k.excede } : {}),
+          thresholds: k.thresholds.map(t => {
+            const out = { level: t.level };
+            if (k.direction === "higher") out.max = t.max === Infinity ? null : t.max;
+            else out.min = t.min;
+            return out;
+          }),
+        })),
+      };
+      const r = await fetch("/api/kpi-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      onSaved({ kpis: mergeKpiConfig(j.kpis), meta: { updatedAt: j.updatedAt, updatedBy: j.updatedBy } });
+      setHistory(null); // invalidate
+      setSaveMsg({ kind: "ok", text: "Guardado correctamente." });
+    } catch (e) {
+      setSaveMsg({ kind: "err", text: `No se pudo guardar: ${e.message}` });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadHistory = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/kpi-history");
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Error cargando historial");
+      setHistory(j.history || []);
+      setShowHistory(true);
+    } catch (e) {
+      setSaveMsg({ kind: "err", text: e.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = {
+    width: "100%", padding: "7px 10px", borderRadius: 7, fontSize: 12, fontFamily: V.mono,
+    color: V.text, background: V.inputBg, border: `1px solid ${V.glassBorder}`,
+    outline: "none", transition: "border-color 0.15s",
+  };
+  const labelStyle = { fontSize: 10, fontFamily: V.mono, color: V.textDim, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4, display: "block" };
+
+  return (
+    <div>
+      {/* Header card */}
+      <div className="fade-card" style={{ ...glassCard(), padding: "18px 22px", marginBottom: 18, background: V.cardGradient }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: V.text, marginBottom: 4 }}>Ajustes de Métricas KPI</div>
+            <div style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>
+              Edita las metas y umbrales de los semáforos. Los cambios se aplican a todo el dashboard al guardar.
+              {configMeta?.updatedAt && (
+                <> · Última edición: <span style={{ color: V.textMuted }}>{new Date(configMeta.updatedAt).toLocaleString("es-MX")}</span>
+                {configMeta.updatedBy ? <> por <span style={{ color: V.textMuted }}>{configMeta.updatedBy}</span></> : null}.</>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={reloadFromServer} disabled={saving} style={{
+              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.8,
+              background: V.btnBg, color: V.textMuted, border: `1px solid ${V.glassBorder}`, cursor: saving ? "wait" : "pointer",
+            }}>↻ Recargar</button>
+            <button onClick={resetToDefaults} disabled={saving} style={{
+              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.8,
+              background: "transparent", color: V.amber, border: `1px solid ${V.amber}55`, cursor: saving ? "wait" : "pointer",
+            }}>Restablecer defaults</button>
+            <button onClick={save} disabled={saving || hasErrors || !dirty} style={{
+              padding: "8px 18px", borderRadius: 8, fontSize: 11, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.8,
+              background: (saving || hasErrors || !dirty) ? V.textDim : `linear-gradient(135deg, ${V.cyan}, ${V.blue})`,
+              color: V.bg, border: "none", cursor: (saving || hasErrors || !dirty) ? "not-allowed" : "pointer",
+              boxShadow: (saving || hasErrors || !dirty) ? "none" : `0 4px 18px ${V.cyan}33`,
+            }}>{saving ? "GUARDANDO…" : "GUARDAR CAMBIOS"}</button>
+          </div>
+        </div>
+        {saveMsg && (
+          <div style={{
+            marginTop: 12, padding: "8px 12px", borderRadius: 8, fontSize: 11, fontFamily: V.mono,
+            background: saveMsg.kind === "ok" ? `${V.cyan}15` : `${V.coral}15`,
+            color: saveMsg.kind === "ok" ? V.cyan : V.coral,
+            border: `1px solid ${saveMsg.kind === "ok" ? V.cyan + "44" : V.coral + "44"}`,
+          }}>{saveMsg.text}</div>
+        )}
+      </div>
+
+      {/* KPI editors */}
+      <div className="grid-2">
+        {draft.map(kpi => {
+          const def = KPI_DEFAULTS.find(d => d.id === kpi.id);
+          const kpiErr = errors[kpi.id];
+          const editableThresholds = kpi.direction === "higher"
+            ? kpi.thresholds.slice(0, -1)  // last is Infinity, read-only
+            : kpi.thresholds;
+          return (
+            <div key={kpi.id} className="fade-card" style={{ ...glassCard(), padding: 0, overflow: "hidden" }}>
+              <div style={{ padding: "12px 18px", borderBottom: `1px solid ${V.glassBorder}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontFamily: V.mono, fontWeight: 700, color: V.text, letterSpacing: 0.8, textTransform: "uppercase" }}>{kpi.title}</div>
+                  <div style={{ fontSize: 10, color: V.textDim, marginTop: 2 }}>{kpi.description}</div>
+                </div>
+                <div style={{
+                  padding: "4px 10px", borderRadius: 12, fontSize: 9, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.5,
+                  background: kpi.direction === "higher" ? `${V.cyan}15` : `${V.coral}15`,
+                  color: kpi.direction === "higher" ? V.cyan : V.coral,
+                  border: `1px solid ${(kpi.direction === "higher" ? V.cyan : V.coral)}33`,
+                  whiteSpace: "nowrap",
+                }}>{kpi.direction === "higher" ? "MAYOR ES MEJOR" : "MENOR ES MEJOR"}</div>
+              </div>
+
+              <div style={{ padding: 16 }}>
+                {/* Meta + Excede */}
+                <div style={{ display: "grid", gridTemplateColumns: kpi.excede !== undefined ? "1fr 1fr" : "1fr", gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <label style={labelStyle}>Meta ({kpi.unit})</label>
+                    <input type="number" step="any" value={kpi.target}
+                      onChange={e => updateKpi(kpi.id, { target: e.target.value })}
+                      style={inputStyle} />
+                    <div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, marginTop: 3 }}>Default: {def.target}</div>
+                  </div>
+                  {kpi.excede !== undefined && (
+                    <div>
+                      <label style={labelStyle}>Tope visual "Excede"</label>
+                      <input type="number" step="any" value={kpi.excede}
+                        onChange={e => updateKpi(kpi.id, { excede: e.target.value })}
+                        style={inputStyle} />
+                      <div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, marginTop: 3 }}>Default: {def.excede}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Threshold inputs */}
+                <div style={{ marginTop: 4 }}>
+                  <label style={labelStyle}>
+                    Umbrales {kpi.direction === "higher" ? "(valor máximo de cada nivel; el siguiente nivel arranca arriba)" : "(valor mínimo para caer en cada nivel)"}
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginTop: 4 }}>
+                    {kpi.thresholds.map((t, i) => {
+                      const isReadOnly = kpi.direction === "higher" && i === kpi.thresholds.length - 1;
+                      const defT = def.thresholds[i];
+                      const defVal = kpi.direction === "higher"
+                        ? (defT.max === Infinity ? "∞" : defT.max)
+                        : defT.min;
+                      const fieldVal = kpi.direction === "higher" ? t.max : t.min;
+                      return (
+                        <div key={t.level} style={{ display: "flex", flexDirection: "column" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                            <div style={{ width: 7, height: 7, borderRadius: "50%", background: t.color }} />
+                            <span style={{ fontSize: 9, fontFamily: V.mono, color: t.color, fontWeight: 700, letterSpacing: 0.5 }}>{t.level}</span>
+                          </div>
+                          {isReadOnly ? (
+                            <div style={{ ...inputStyle, color: V.textDim, background: V.tableHeaderBg, display: "flex", alignItems: "center" }}>∞ (sin tope)</div>
+                          ) : (
+                            <input type="number" step="any" value={fieldVal}
+                              onChange={e => updateThreshold(kpi.id, i, kpi.direction === "higher" ? "max" : "min", e.target.value)}
+                              style={inputStyle} />
+                          )}
+                          <div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, marginTop: 3 }}>Default: {defVal}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {kpiErr && (
+                  <div style={{ marginTop: 12, padding: "8px 10px", borderRadius: 7, fontSize: 11, fontFamily: V.mono, color: V.coral, background: `${V.coral}15`, border: `1px solid ${V.coral}33` }}>
+                    {kpiErr.map((e, i) => <div key={i}>• {e}</div>)}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* History section */}
+      <div style={{ marginTop: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontFamily: V.mono, fontWeight: 700, color: V.textMuted, letterSpacing: 0.8, textTransform: "uppercase" }}>Historial de cambios</div>
+          <button onClick={() => { if (!showHistory) loadHistory(); else setShowHistory(false); }} disabled={saving} style={{
+            padding: "6px 12px", borderRadius: 7, fontSize: 10, fontFamily: V.mono, fontWeight: 700, letterSpacing: 0.6,
+            background: V.btnBg, color: V.textMuted, border: `1px solid ${V.glassBorder}`, cursor: saving ? "wait" : "pointer",
+          }}>{showHistory ? "Ocultar" : (history ? "Mostrar" : "Cargar historial")}</button>
+        </div>
+        {showHistory && history && (
+          <div className="fade-card" style={{ ...glassCard(), padding: 14 }}>
+            {history.length === 0 ? (
+              <div style={{ fontSize: 12, fontFamily: V.mono, color: V.textDim, textAlign: "center", padding: 14 }}>Sin cambios registrados todavía.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
+                {[...history].reverse().map((h, i) => (
+                  <details key={`${h.at}-${i}`} style={{ padding: "8px 12px", borderRadius: 8, background: V.tableHeaderBg, border: `1px solid ${V.glassBorder}` }}>
+                    <summary style={{ cursor: "pointer", fontSize: 11, fontFamily: V.mono, color: V.text, display: "flex", justifyContent: "space-between", gap: 10 }}>
+                      <span>{new Date(h.at).toLocaleString("es-MX")}</span>
+                      <span style={{ color: V.textDim }}>{h.by || "—"}</span>
+                    </summary>
+                    <pre style={{ marginTop: 8, fontSize: 10, fontFamily: V.mono, color: V.textDim, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+{JSON.stringify(h.kpis, null, 2)}
+                    </pre>
+                  </details>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 export default function Dashboard() {
   const [authUser, setAuthUser] = useState(null);
@@ -590,6 +977,23 @@ function DashboardMain({ user, onLogout }) {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [mesDropdown, setMesDropdown] = useState(false);
   const [themeMode, setThemeMode] = useState(INITIAL_THEME);
+
+  // Live KPI definitions: defaults first, replaced once /api/kpi-config resolves.
+  const [kpiDefs, setKpiDefs] = useState(() => cloneKpiDefs(KPI_DEFAULTS));
+  const [kpiConfigMeta, setKpiConfigMeta] = useState({ updatedAt: null, updatedBy: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/kpi-config")
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (cancelled || !j) return;
+        setKpiDefs(mergeKpiConfig(j.kpis));
+        setKpiConfigMeta({ updatedAt: j.updatedAt, updatedBy: j.updatedBy });
+      })
+      .catch(() => { /* keep defaults */ });
+    return () => { cancelled = true; };
+  }, []);
 
   applyTheme(themeMode);
   useEffect(() => {
@@ -865,7 +1269,7 @@ function DashboardMain({ user, onLogout }) {
             const kpiValues = { flujo: flujoVal, traspJuridico: traspJurVal, traspComercial: traspComVal, apoyoComercial: apoyoVal };
 
             // Count statuses for summary
-            const statuses = KPI_DEFS.map(k => evaluateKPI(k, kpiValues[k.id]));
+            const statuses = kpiDefs.map(k => evaluateKPI(k, kpiValues[k.id]));
             const excCount = statuses.filter(s => s.level === "EXCEDE").length;
             const sobCount = statuses.filter(s => s.level === "SOBRESALE").length;
             const cumCount = statuses.filter(s => s.level === "CUMPLE").length;
@@ -899,7 +1303,7 @@ function DashboardMain({ user, onLogout }) {
 
               {/* KPI Cards */}
               <div className="grid-2">
-                {KPI_DEFS.map(kpi => (
+                {kpiDefs.map(kpi => (
                   <KPISemaforo key={kpi.id} kpi={kpi} value={kpiValues[kpi.id]} />
                 ))}
               </div>
@@ -1053,6 +1457,15 @@ function DashboardMain({ user, onLogout }) {
               </div>
             </>);
           })()}
+
+          {tab === "ajustes" && (
+            <AjustesPanel
+              kpiDefs={kpiDefs}
+              configMeta={kpiConfigMeta}
+              user={user}
+              onSaved={({ kpis, meta }) => { setKpiDefs(kpis); setKpiConfigMeta(meta); }}
+            />
+          )}
 
           {tab === "info" && (
             <div style={{ maxWidth: 600, margin: "0 auto" }}>
