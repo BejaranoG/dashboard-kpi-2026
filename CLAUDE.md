@@ -62,12 +62,12 @@ Tres piezas:
 
 ### Datos esperados del Sheet
 
-Los nombres exactos de hoja están en `SHEET_NAMES`. Columnas críticas por hoja:
+Los nombres exactos de hoja están en `SHEET_NAMES` y deben coincidir **exactamente** (incluyendo mayúsculas) con el nombre de la pestaña en Google Sheets. **Cuidado:** si el nombre no existe (p. ej. la pestaña fue renombrada), el endpoint `gviz/tq` no da error — responde 200 OK con el contenido de la **primera pestaña del libro**, silenciosamente. Si un KPI o tabla aparece vacío o en cero, verifica primero que el nombre en `SHEET_NAMES` siga coincidiendo con la pestaña real antes de sospechar del código. Columnas críticas por hoja:
 
 | Hoja                    | Columnas usadas                                                                                 |
 |-------------------------|--------------------------------------------------------------------------------------------------|
 | `Traspasos`             | `Tipo Traspaso`, `Cliente`, `Numero Cliente`, `Saldo Neto`, `Mes`, `DIAS DE IMPAGO`, `SALDO EN IMPAGO`, `Dias para contacto` |
-| `Pagos`                 | `Cliente`, `Pago Recibido`, `Mes`                                                                |
+| `Pagos RS`              | `Cliente`, `Pago Recibido`, `Mes`                                                                |
 | `PAGOS APOYO COMERCIAL` | `Cliente`, `Pago Recibido`, `Mes`                                                                |
 | `Gasto Extrajudicial`   | `Cliente`, `Saldo Neto`, `Saldo en Impago`, `Despacho`, `Honorario`, `Mes Nombre`, `Pago`        |
 | `Bitacora STAFF`        | `PROMEDIO` (primera fila)                                                                        |

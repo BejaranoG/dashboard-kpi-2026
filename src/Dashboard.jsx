@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
    ═══════════════════════════════════════════════════════════════════ */
 
 const SHEET_NAMES = {
-  traspasos: "Traspasos", pagos: "Pagos", apoyoComercial: "PAGOS APOYO COMERCIAL",
+  traspasos: "Traspasos", pagos: "Pagos RS", apoyoComercial: "PAGOS APOYO COMERCIAL",
   gastoExtrajudicial: "Gasto Extrajudicial", bitacoraStaff: "Bitacora STAFF",
   actividadesStaff: "Actividades STAFF", calendarioCV: "Calendario Trasp. CV",
   bitacoraStaffCA: "Bitacora STAFF TAB CA", totales: "Totales",
