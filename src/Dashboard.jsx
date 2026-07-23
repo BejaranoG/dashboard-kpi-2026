@@ -1261,11 +1261,12 @@ function DashboardMain({ user, onLogout }) {
 
           {/* ═══ RESUMEN KPIs ═══ */}
           {tab === "kpis" && (!loading || connected) && (() => {
-            const filterActive = meses.length > 0;
-            const flujoVal = sum(pagos, "PagoRecibido") / 1e6;
-            const traspJurVal = salJur.length;
-            const traspComVal = salCom.length;
-            const apoyoVal = sum(apoyo, "PagoRecibido") / 1e6;
+            // Las metas son anuales: los KPIs siempre usan el total del año,
+            // sin aplicar el filtro de mes (que sí afecta otros tabs).
+            const flujoVal = sum(data.pagos, "PagoRecibido") / 1e6;
+            const traspJurVal = byTipo("RS-JURIDICO").length;
+            const traspComVal = byTipo("RS-COMERCIAL").length;
+            const apoyoVal = sum(data.apoyoComercial, "PagoRecibido") / 1e6;
             const kpiValues = { flujo: flujoVal, traspJuridico: traspJurVal, traspComercial: traspComVal, apoyoComercial: apoyoVal };
 
             // Count statuses for summary
@@ -1284,10 +1285,10 @@ function DashboardMain({ user, onLogout }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 4 }}>
-                      {filterActive ? "KPIs del periodo seleccionado" : "Estado General KPIs 2026"}
+                      Estado General KPIs 2026
                     </div>
                     <div style={{ fontSize: 11, fontFamily: V.mono, color: V.textDim }}>
-                      {filterActive ? "Valores parciales vs. metas anuales — quita el filtro para ver acumulado" : "Evaluación acumulada del ejercicio en curso — Ref. ejercicio anterior 2025"}
+                      Evaluación acumulada del ejercicio en curso — Ref. ejercicio anterior 2025
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
