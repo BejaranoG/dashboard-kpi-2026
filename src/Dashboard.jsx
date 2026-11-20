@@ -1105,7 +1105,7 @@ function DashboardMain({ user, onLogout }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div className="status-dots">
-                {[["NM","#dc2626"],["NC","#f59e0b"],["C","#6b7280"],["S","#3b82f6"],["E","#22c55e"]].map(([l,c]) => (
+                {[["D","#dc2626"],["NC","#f59e0b"],["C","#6b7280"],["S","#3b82f6"],["E","#22c55e"]].map(([l,c]) => (
                   <div key={l} style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 9, fontFamily: V.mono, color: V.textDim }}>
                     <div style={{ width: 7, height: 7, borderRadius: "50%", background: c, boxShadow: `0 0 5px ${c}66` }} />{l}
                   </div>
@@ -1231,7 +1231,7 @@ function DashboardMain({ user, onLogout }) {
           {meses.length > 0 && (
             <div className="fade-card" style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 14px", borderRadius: 12, background: `${V.amber}10`, border: `1px solid ${V.amber}33` }}>
               <span style={{ fontSize: 10, fontFamily: V.mono, fontWeight: 700, color: V.amber, letterSpacing: 1.2, textTransform: "uppercase" }}>
-                Filtrando por
+                {tab === "kpis" ? "Filtro inactivo aquí — metas anuales" : "Filtrando por"}
               </span>
               {meses.map(m => (
                 <button key={m} onClick={() => setMeses(prev => prev.filter(x => x !== m))} title={`Quitar ${m}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px 3px 11px", borderRadius: 14, fontSize: 11, fontFamily: V.mono, fontWeight: 600, color: V.amber, background: `${V.amber}22`, border: `1px solid ${V.amber}55`, cursor: "pointer", transition: "all 0.15s" }}
