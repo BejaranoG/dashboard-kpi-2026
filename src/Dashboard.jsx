@@ -63,7 +63,7 @@ const EMPTY_DATA = {
   apoyoComercial: [],
   gastoExtrajudicial: [],
   actividades: [],
-  promedioStaff: 0, promedioCalendario: 0, promedioStaffCA: 0,
+  promedioStaff: 0, promedioCalendario: 0, promedioStaffCA: 0, promedioContacto: 0,
   totales: { flujoRecibido: 0, traspComercial: 0, saldoComercial: 0, traspJuridico: 0, saldoJuridico: 0 },
 };
 
@@ -1038,6 +1038,18 @@ function DashboardMain({ user, onLogout }) {
     } catch { return null; }
   }
 
+  // ponytail: gviz range= trae una sola celda; no hace falta parsear la hoja entera
+  async function fetchCell(name, range) {
+    const url = `https://docs.google.com/spreadsheets/d/${HARDCODED_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}&range=${range}&headers=0`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const t = (await res.text()).trim();
+      if (t.startsWith("<")) return null;
+      return t.replace(/^"|"$/g, "");
+    } catch { return null; }
+  }
+
   async function loadData() {
     setLoading(true);
     try {
@@ -1054,6 +1066,7 @@ function DashboardMain({ user, onLogout }) {
       const ac = await fetchSheet(SHEET_NAMES.actividadesStaff); if (ac) { const a = ac.map(r => (r["ACTIVIDADES STAFF COBRANZA"]||Object.values(r)[0]||"").trim()).filter(x => x && x !== "ACTIVIDADES STAFF COBRANZA"); if (a.length) nd.actividades = a; }
       const ca = await fetchSheet(SHEET_NAMES.calendarioCV); if (ca?.[0]?.["Resultado Promedio"]) nd.promedioCalendario = parseNum(ca[0]["Resultado Promedio"]);
       const cb = await fetchSheet(SHEET_NAMES.bitacoraStaffCA); if (cb?.[0]?.["PROMEDIO"]) nd.promedioStaffCA = parseNum(cb[0]["PROMEDIO"]);
+      const pc = await fetchCell(SHEET_NAMES.traspasos, "O3"); if (pc) nd.promedioContacto = parseNum(pc);
       const to = await fetchSheet(SHEET_NAMES.totales); if (to?.[0]) nd.totales = { flujoRecibido: parseNum(to[0]["Flujo Recibido"]), traspComercial: parseNum(to[0]["Traspasos a Comercial"]), saldoComercial: parseNum(to[0]["Saldo Neto a Comercial"]), traspJuridico: parseNum(to[0]["Traspasos a Juridico"]), saldoJuridico: parseNum(to[0]["Saldo Neto a Juridico"]) };
       setData(nd); setConnected(true);
       setLastUpdate(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }));
@@ -1376,7 +1389,7 @@ function DashboardMain({ user, onLogout }) {
               <div className="grid-span-full">
                 <Panel title="Tiempo Promedio de Contacto" accent={V.amber} delay={160}>
                   <div className="gauge-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 0", flexWrap: "wrap" }}>
-                    <Ring value={1.47} min={0} max={5} label="DÍAS" color={V.amber} size={150} />
+                    <Ring value={data.promedioContacto} min={0} max={5} label="DÍAS" color={V.amber} size={150} />
                     <div style={{ textAlign: "center" }}><div style={{ fontSize: 9, fontFamily: V.mono, color: V.textDim, letterSpacing: 2, marginBottom: 4 }}>BITÁCORA TRASPASO-CONTACTO</div><div style={{ fontSize: 13, color: V.textMuted, lineHeight: 1.6, maxWidth: 320 }}>Promedio de días entre traspaso y primer contacto con el cliente.</div></div>
                   </div>
                 </Panel>
